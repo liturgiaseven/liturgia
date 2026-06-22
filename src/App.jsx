@@ -16,11 +16,13 @@ import Clock from './components/Clock'
 import ServicePanel from './components/ServicePanel'
 import ActiveSegment from './components/ActiveSegment'
 import BiblePanel from './components/BiblePanel'
-import { BookOpen, Church, Pencil, Check, RotateCcw, BookMarked } from 'lucide-react'
+import { BookOpen, Church, Pencil, Check, RotateCcw, BookMarked, RefreshCw } from 'lucide-react'
+import { useVersionCheck } from './hooks/useVersionCheck'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
 
 export default function App() {
+  const updateAvailable = useVersionCheck(APP_VERSION)
   const [overrides, setOverrides] = useState(loadOverrides)
   const [serviceIdx, setServiceIdx] = useState(0)
   const [selectedId, setSelectedId] = useState(null)
@@ -127,6 +129,20 @@ export default function App() {
           <Clock />
         </div>
       </header>
+
+      {updateAvailable && (
+        <div className="flex items-center justify-between gap-3 px-6 py-2.5 bg-emerald-700 border-b border-emerald-600 shrink-0">
+          <span className="text-sm text-white font-semibold">
+            Nova versão disponível — atualize para usar a versão mais recente.
+          </span>
+          <button
+            onClick={() => window.location.reload()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-emerald-800 text-sm font-bold hover:bg-emerald-50 transition-colors shrink-0"
+          >
+            <RefreshCw className="w-4 h-4" /> Atualizar agora
+          </button>
+        </div>
+      )}
 
       <BiblePanel open={bibleOpen} onClose={() => setBibleOpen(false)} />
 
