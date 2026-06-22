@@ -17,6 +17,7 @@ export const SERVICES = [
           'Microfone do dirigente ativo',
         ],
         icon: 'music',
+        hymnCategory: 'abertura',
       },
       {
         id: 'es-informativo',
@@ -86,6 +87,7 @@ export const SERVICES = [
           'Câmeras focadas no ministério de música',
         ],
         icon: 'music',
+        hymnCategory: 'louvor',
       },
       {
         id: 'cd-ofertorio',
@@ -98,6 +100,7 @@ export const SERVICES = [
           'Anunciar forma de contribuição (PIX, envelope)',
         ],
         icon: 'heart',
+        hymnCategory: 'ofertorio',
       },
       {
         id: 'cd-oracao',
@@ -110,6 +113,7 @@ export const SERVICES = [
           'Slide com "Momento de Oração" na tela',
         ],
         icon: 'pray',
+        hymnCategory: 'oracao',
       },
       {
         id: 'cd-mensagem-musical',
@@ -122,6 +126,7 @@ export const SERVICES = [
           'Câmera no palco/solista',
         ],
         icon: 'microphone',
+        hymnCategory: 'especial',
       },
       {
         id: 'cd-sermao',
@@ -148,6 +153,7 @@ export const SERVICES = [
           'Preparar slides de encerramento / próximos eventos',
         ],
         icon: 'cross',
+        hymnCategory: 'apelo',
       },
     ],
   },

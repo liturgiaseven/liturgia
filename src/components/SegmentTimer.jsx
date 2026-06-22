@@ -9,6 +9,7 @@ export default function SegmentTimer({ segment }) {
   const [running, setRunning] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editMin, setEditMin] = useState(segment?.duration ?? 10)
+  const [editSec, setEditSec] = useState(0)
   const intervalRef = useRef(null)
   const remainingRef = useRef(defaultDuration)
 
@@ -20,6 +21,7 @@ export default function SegmentTimer({ segment }) {
     remainingRef.current = secs
     setRunning(false)
     setEditMin(segment?.duration ?? 10)
+    setEditSec(0)
     setEditing(false)
   }, [segment?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -49,12 +51,15 @@ export default function SegmentTimer({ segment }) {
   }
 
   function handleEditConfirm() {
-    const mins = Math.max(1, Math.min(180, Number(editMin) || 10))
-    const secs = mins * 60
+    const mins = Math.max(0, Math.min(180, Math.floor(Number(editMin) || 0)))
+    const secs = Math.max(0, Math.min(59, Math.floor(Number(editSec) || 0)))
+    let total = mins * 60 + secs
+    if (total < 1) total = 60 // mínimo de 1 segundo
     setEditMin(mins)
-    setTotalSecs(secs)
-    setRemaining(secs)
-    remainingRef.current = secs
+    setEditSec(secs)
+    setTotalSecs(total)
+    setRemaining(total)
+    remainingRef.current = total
     setRunning(false)
     setEditing(false)
   }
@@ -139,15 +144,25 @@ export default function SegmentTimer({ segment }) {
             <>
               <input
                 type="number"
-                min={1}
+                min={0}
                 max={180}
                 value={editMin}
                 onChange={e => setEditMin(e.target.value)}
                 onKeyDown={handleEditKey}
                 autoFocus
-                className="w-16 bg-gray-800 border border-blue-500 rounded-md px-2 py-0.5 text-white text-xs text-center focus:outline-none"
+                className="w-14 bg-gray-800 border border-blue-500 rounded-md px-2 py-0.5 text-white text-xs text-center focus:outline-none"
               />
               <span>min</span>
+              <input
+                type="number"
+                min={0}
+                max={59}
+                value={editSec}
+                onChange={e => setEditSec(e.target.value)}
+                onKeyDown={handleEditKey}
+                className="w-14 bg-gray-800 border border-blue-500 rounded-md px-2 py-0.5 text-white text-xs text-center focus:outline-none"
+              />
+              <span>seg</span>
               <button
                 onClick={handleEditConfirm}
                 className="ml-1 p-1 rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors"
@@ -158,9 +173,14 @@ export default function SegmentTimer({ segment }) {
             </>
           ) : (
             <>
-              <span>Duração: {Math.round(totalSecs / 60)} min</span>
+              <span>Duração: {formatDuration(totalSecs)}</span>
               <button
-                onClick={() => { setEditing(true); setRunning(false) }}
+                onClick={() => {
+                  setEditMin(Math.floor(totalSecs / 60))
+                  setEditSec(totalSecs % 60)
+                  setEditing(true)
+                  setRunning(false)
+                }}
                 className="p-1 rounded hover:bg-gray-800 hover:text-gray-300 transition-colors"
                 title="Editar duração"
               >
