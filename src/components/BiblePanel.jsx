@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { BookMarked, X, Search, Loader2, Tv, ChevronLeft, ChevronRight } from 'lucide-react'
 import { loadBible, parseReference, BIBLE_VERSION } from '../data/bible'
-import { openProjectionWindow, sendToProjection, clearProjection } from '../utils/projection'
+import { openProjectionWindow, sendToProjection, clearProjection, registerNavHandler, unregisterNavHandler } from '../utils/projection'
 
 export default function BiblePanel({ open, onClose }) {
   const [books, setBooks] = useState(null)
@@ -70,6 +70,13 @@ export default function BiblePanel({ open, onClose }) {
     }
     setBookIndex(bi); setChapter(ch); setSelStart(v); setSelEnd(v)
   }, [book, bookIndex, chapter, selStart, books])
+
+  // Register nav handler so projection window buttons also advance verses
+  useEffect(() => {
+    if (!projActive) { unregisterNavHandler(); return }
+    registerNavHandler((dir) => moveVerse(dir))
+    return () => unregisterNavHandler()
+  }, [projActive, moveVerse])
 
   // Keyboard nav when projecting
   useEffect(() => {

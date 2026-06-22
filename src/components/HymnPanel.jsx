@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Music2, X, Pencil, Check, Plus, Trash2, Tv, ChevronLeft, ChevronRight } from 'lucide-react'
 import { HYMNS, HYMN_CATEGORIES } from '../data/hymns'
-import { openProjectionWindow, sendToProjection, clearProjection } from '../utils/projection'
+import { openProjectionWindow, sendToProjection, clearProjection, registerNavHandler, unregisterNavHandler } from '../utils/projection'
 
 const LS_KEY = 'liturgia.hymns.v1'
 
@@ -13,8 +13,20 @@ function saveStore(store) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(store)) } catch {}
 }
 
+// Split lyrics into stanzas.
+// If double newlines exist, use them. Otherwise group every 4 non-empty lines.
 function parseStanzas(lyrics) {
-  return (lyrics || '').split(/\n{2,}/).map((s) => s.trim()).filter(Boolean)
+  if (!lyrics?.trim()) return []
+  if (/\n[ \t]*\n/.test(lyrics)) {
+    return lyrics.split(/\n[ \t]*\n/).map((s) => s.trim()).filter(Boolean)
+  }
+  const lines = lyrics.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (lines.length === 0) return []
+  const stanzas = []
+  for (let i = 0; i < lines.length; i += 4) {
+    stanzas.push(lines.slice(i, i + 4).join('\n'))
+  }
+  return stanzas
 }
 
 export default function HymnPanel({ category, accent }) {
@@ -24,6 +36,9 @@ export default function HymnPanel({ category, accent }) {
   const [draft, setDraft] = useState('')
   const [stanzaIdx, setStanzaIdx] = useState(0)
   const [projActive, setProjActive] = useState(false)
+
+  // Keep a ref to stanzas length for nav handler closure
+  const stanzasRef = useRef([])
 
   useEffect(() => {
     setOpenId(null)
@@ -36,8 +51,35 @@ export default function HymnPanel({ category, accent }) {
     if (!openId && projActive) {
       setProjActive(false)
       clearProjection()
+      unregisterNavHandler()
     }
   }, [openId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Register/unregister nav handler when projActive changes
+  useEffect(() => {
+    if (!projActive) { unregisterNavHandler(); return }
+    registerNavHandler((dir) => {
+      setStanzaIdx((i) => Math.max(0, Math.min(stanzasRef.current.length - 1, i + dir)))
+    })
+    return () => unregisterNavHandler()
+  }, [projActive])
+
+  // Keyboard nav when projActive
+  useEffect(() => {
+    if (!projActive) return
+    function onKey(e) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault()
+        setStanzaIdx((i) => Math.min(stanzasRef.current.length - 1, i + 1))
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        setStanzaIdx((i) => Math.max(0, i - 1))
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [projActive])
 
   if (!category) return null
 
@@ -49,6 +91,7 @@ export default function HymnPanel({ category, accent }) {
 
   const openHymn = hymns.find((h) => h.id === openId)
   const stanzas = openHymn ? parseStanzas(lyricsOf(openHymn)) : []
+  stanzasRef.current = stanzas
   const currentStanza = stanzas[stanzaIdx] ?? ''
 
   // Broadcast when stanza or projActive changes
@@ -75,7 +118,7 @@ export default function HymnPanel({ category, accent }) {
   function closeModal() {
     setOpenId(null)
     setEditing(false)
-    if (projActive) { clearProjection(); setProjActive(false) }
+    if (projActive) { clearProjection(); setProjActive(false); unregisterNavHandler() }
   }
 
   function startEdit() {
@@ -123,6 +166,7 @@ export default function HymnPanel({ category, accent }) {
     if (projActive) {
       setProjActive(false)
       clearProjection()
+      unregisterNavHandler()
     } else {
       openProjectionWindow()
       setProjActive(true)
@@ -147,7 +191,6 @@ export default function HymnPanel({ category, accent }) {
         <button
           onClick={addCustomHymn}
           className="flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2 py-1 rounded-lg hover:bg-gray-800 transition-colors"
-          title="Adicionar hino"
         >
           <Plus className="w-3.5 h-3.5" /> Adicionar
         </button>
@@ -178,10 +221,7 @@ export default function HymnPanel({ category, accent }) {
 
       {/* Modal de letra */}
       {openHymn && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          onClick={closeModal}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={closeModal}>
           <div
             className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl flex flex-col w-full max-w-2xl max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
@@ -226,13 +266,18 @@ export default function HymnPanel({ category, accent }) {
             {/* Corpo */}
             <div className="flex-1 overflow-y-auto scrollbar-thin p-6">
               {editing ? (
-                <textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  autoFocus
-                  placeholder="Cole ou digite a letra (linhas em branco separam estrofes)…"
-                  className="w-full h-80 bg-gray-950 border border-gray-700 rounded-xl p-4 text-gray-100 text-sm leading-relaxed focus:outline-none focus:border-blue-500 resize-none scrollbar-thin"
-                />
+                <>
+                  <textarea
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    autoFocus
+                    placeholder="Cole ou digite a letra. Separe estrofes com uma linha em branco (Enter duplo). Se não houver, as linhas serão agrupadas de 4 em 4 automaticamente."
+                    className="w-full h-72 bg-gray-950 border border-gray-700 rounded-xl p-4 text-gray-100 text-sm leading-relaxed focus:outline-none focus:border-blue-500 resize-none scrollbar-thin"
+                  />
+                  <p className="mt-2 text-xs text-gray-600">
+                    Dica: deixe uma linha em branco entre as estrofes para controlar a divisão.
+                  </p>
+                </>
               ) : stanzas.length > 0 ? (
                 <div className="flex flex-col items-center gap-4">
                   {/* Slide da estrofe atual */}
@@ -247,7 +292,7 @@ export default function HymnPanel({ category, accent }) {
                       onClick={() => goStanza(-1)}
                       disabled={stanzaIdx === 0}
                       className="p-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      title="Estrofe anterior"
+                      title="Estrofe anterior (←)"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -258,7 +303,7 @@ export default function HymnPanel({ category, accent }) {
                       onClick={() => goStanza(1)}
                       disabled={stanzaIdx === stanzas.length - 1}
                       className="p-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      title="Próxima estrofe"
+                      title="Próxima estrofe (→)"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -278,14 +323,14 @@ export default function HymnPanel({ category, accent }) {
               )}
             </div>
 
-            {/* Rodapé com botão de projeção */}
+            {/* Rodapé */}
             {!editing && stanzas.length > 0 && (
               <div className="px-5 py-3 border-t border-gray-800 flex justify-end">
                 <button
                   onClick={handleProject}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${
                     projActive
-                      ? 'bg-purple-700 hover:bg-purple-600 text-white'
+                      ? 'bg-amber-700 hover:bg-amber-600 text-white'
                       : 'bg-purple-700 hover:bg-purple-600 text-white'
                   }`}
                 >
