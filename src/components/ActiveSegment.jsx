@@ -3,6 +3,7 @@ import Icon from './Icon'
 import SegmentTimer from './SegmentTimer'
 import HymnPanel from './HymnPanel'
 import YoutubeField from './YoutubeField'
+import ImageField from './ImageField'
 
 export default function ActiveSegment({
   service,
@@ -54,6 +55,11 @@ export default function ActiveSegment({
       {/* YouTube (em segmentos que usam vídeo) */}
       {segment.hasYoutube && (
         <YoutubeField segmentId={segment.id} />
+      )}
+
+      {/* Imagens / QR para o telão */}
+      {segment.hasImages && (
+        <ImageField segmentId={segment.id} title={segment.imagesLabel} accent={accentClass} />
       )}
 
       {/* Hinos sugeridos (apenas em momentos musicais) */}
