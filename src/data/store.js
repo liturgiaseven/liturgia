@@ -42,15 +42,18 @@ export function buildServices(overrides) {
           segs.push(baseById[id])
           seen.add(id)
         } else if (segOv[id]?._custom) {
+          // features stored in so.segmentFeatures[id]; fall back to legacy segOv[id] fields
+          const f = (so.segmentFeatures || {})[id] || {}
+          const fLeg = segOv[id]
           segs.push({
             id,
             name: segOv[id].name ?? 'Segmento',
             duration: segOv[id].duration ?? 5,
             icon: 'star',
             _custom: true,
-            hasYoutube: segOv[id].hasYoutube ?? false,
-            hasImages: segOv[id].hasImages ?? false,
-            hymnCategory: segOv[id].hasHymns ? 'especial' : undefined,
+            hasYoutube: f.hasYoutube ?? fLeg.hasYoutube ?? false,
+            hasImages:  f.hasImages  ?? fLeg.hasImages  ?? false,
+            hymnCategory: (f.hasHymns ?? fLeg.hasHymns ?? false) ? 'especial' : undefined,
           })
           seen.add(id)
         }
@@ -134,7 +137,15 @@ export function addSegment(ov, serviceId) {
 }
 
 export function setSegmentFeature(ov, serviceId, segId, key, value) {
-  return withSegment(ov, serviceId, segId, { [key]: value })
+  const so = ov[serviceId] || {}
+  const sf = so.segmentFeatures || {}
+  return {
+    ...ov,
+    [serviceId]: {
+      ...so,
+      segmentFeatures: { ...sf, [segId]: { ...(sf[segId] || {}), [key]: value } },
+    },
+  }
 }
 
 export function removeSegment(ov, serviceId, segId) {
