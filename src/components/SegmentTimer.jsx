@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { formatDuration } from '../data/liturgy'
-import { Play, Pause, RotateCcw, Pencil, Check } from 'lucide-react'
+import { Play, Pause, RotateCcw, Pencil, Check, Tv, Maximize2, X } from 'lucide-react'
 
 export default function SegmentTimer({ segment }) {
   const defaultDuration = (segment?.duration ?? 10) * 60
@@ -10,8 +10,10 @@ export default function SegmentTimer({ segment }) {
   const [editing, setEditing] = useState(false)
   const [editMin, setEditMin] = useState(segment?.duration ?? 10)
   const [editSec, setEditSec] = useState(0)
+  const [projecting, setProjecting] = useState(false)
   const intervalRef = useRef(null)
   const remainingRef = useRef(defaultDuration)
+  const projRef = useRef(null)
 
   // Reset when segment changes
   useEffect(() => {
@@ -23,7 +25,24 @@ export default function SegmentTimer({ segment }) {
     setEditMin(segment?.duration ?? 10)
     setEditSec(0)
     setEditing(false)
+    setProjecting(false)
   }, [segment?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!projecting) return
+    function onKey(e) {
+      if (e.key === 'Escape') { if (document.fullscreenElement) document.exitFullscreen?.(); setProjecting(false) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [projecting])
+
+  function toggleProjFullscreen() {
+    const el = projRef.current
+    if (!el) return
+    if (!document.fullscreenElement) el.requestFullscreen?.()
+    else document.exitFullscreen?.()
+  }
 
   useEffect(() => {
     if (running) {
@@ -96,6 +115,13 @@ export default function SegmentTimer({ segment }) {
           Contagem Regressiva
         </span>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setProjecting(true)}
+            className="p-1.5 rounded-lg text-gray-500 hover:text-amber-400 hover:bg-gray-800 transition-colors"
+            title="Projetar no telão"
+          >
+            <Tv className="w-4 h-4" />
+          </button>
           <button
             onClick={handleReset}
             className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
@@ -193,6 +219,79 @@ export default function SegmentTimer({ segment }) {
           {formatDuration(remaining)} restantes
         </span>
       </div>
+
+      {/* Projeção no telão */}
+      {projecting && (
+        <div
+          ref={projRef}
+          className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center px-[8%]"
+        >
+          <p className="text-gray-400 font-semibold uppercase tracking-widest mb-6"
+             style={{ fontSize: 'clamp(0.9rem, 2vw, 1.5rem)' }}>
+            {segment?.name}
+          </p>
+          <p
+            className={`font-mono font-bold tabular-nums ${
+              expired ? 'text-red-400 animate-pulse' : progress <= 0.25 ? 'text-red-400' : progress <= 0.5 ? 'text-yellow-400' : 'text-emerald-400'
+            }`}
+            style={{ fontSize: 'clamp(5rem, 22vw, 18rem)', lineHeight: 1 }}
+          >
+            {expired ? '00:00' : formatDuration(remaining)}
+          </p>
+          {expired && (
+            <p className="mt-6 text-red-400 font-bold animate-pulse"
+               style={{ fontSize: 'clamp(1rem, 3vw, 2.5rem)' }}>
+              Tempo esgotado!
+            </p>
+          )}
+
+          {/* Progress bar */}
+          <div className="mt-12 w-full max-w-2xl h-3 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ${
+                expired ? 'bg-red-500' : progress <= 0.25 ? 'bg-red-500' : progress <= 0.5 ? 'bg-yellow-500' : 'bg-emerald-500'
+              }`}
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
+
+          {/* Controls */}
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button
+              onClick={toggleProjFullscreen}
+              className="p-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
+              title="Tela cheia"
+            >
+              <Maximize2 className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => { if (document.fullscreenElement) document.exitFullscreen?.(); setProjecting(false) }}
+              className="p-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
+              title="Fechar (Esc)"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Play/Pause inline */}
+          <div className="absolute bottom-8 flex gap-4">
+            <button
+              onClick={handleReset}
+              className="p-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
+              title="Reiniciar"
+            >
+              <RotateCcw className="w-6 h-6" />
+            </button>
+            <button
+              onClick={() => !expired && setRunning(r => !r)}
+              disabled={expired}
+              className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur font-semibold transition-colors disabled:opacity-40"
+            >
+              {running ? <><Pause className="w-5 h-5" /> Pausar</> : <><Play className="w-5 h-5" /> Iniciar</>}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

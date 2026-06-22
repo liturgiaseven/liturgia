@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Icon from './Icon'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, X, Plus } from 'lucide-react'
 
 const colorMap = {
   blue: {
@@ -23,6 +23,8 @@ export default function ServicePanel({
   onRename,
   onDuration,
   onReorder,
+  onAdd,
+  onRemove,
 }) {
   const colors = colorMap[service.color] ?? colorMap.blue
   const [dragIdx, setDragIdx] = useState(null)
@@ -73,8 +75,24 @@ export default function ServicePanel({
                 <span className="text-xs text-gray-500">min</span>
               </div>
             </div>
+            {service.segments.length > 1 && (
+              <button
+                onClick={() => onRemove?.(seg.id)}
+                onDragStart={(e) => e.preventDefault()}
+                className="shrink-0 p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-gray-800 transition-colors"
+                title="Remover segmento"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         ))}
+        <button
+          onClick={() => onAdd?.()}
+          className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-gray-600 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:border-gray-400 transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Adicionar segmento
+        </button>
       </div>
     )
   }

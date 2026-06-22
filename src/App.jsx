@@ -8,6 +8,8 @@ import {
   renameService,
   setOrder,
   resetService,
+  addSegment,
+  removeSegment,
 } from './data/store'
 import Clock from './components/Clock'
 import ServicePanel from './components/ServicePanel'
@@ -68,6 +70,13 @@ export default function App() {
   }
   function handleRenameService(name) {
     setOverrides((ov) => renameService(ov, service.id, name))
+  }
+  function handleAddSegment() {
+    setOverrides((ov) => addSegment(ov, service.id))
+  }
+  function handleRemoveSegment(segId) {
+    if (segment?.id === segId) selectSegment(Math.max(0, segmentIndex - 1))
+    setOverrides((ov) => removeSegment(ov, service.id, segId))
   }
   function handleResetService() {
     if (window.confirm(`Restaurar a programação padrão de "${service.name}"? As edições de títulos, tempos e ordem serão perdidas.`)) {
@@ -185,6 +194,8 @@ export default function App() {
               onRename={handleRename}
               onDuration={handleDuration}
               onReorder={handleReorder}
+              onAdd={handleAddSegment}
+              onRemove={handleRemoveSegment}
             />
           </div>
 
