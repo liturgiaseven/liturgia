@@ -4,7 +4,7 @@
 let cache = null
 let loadingPromise = null
 
-export const BIBLE_VERSION = 'Almeida (Domínio Público)'
+export const BIBLE_VERSION = 'Almeida'
 
 export function loadBible() {
   if (cache) return Promise.resolve(cache)

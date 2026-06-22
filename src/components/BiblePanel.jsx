@@ -230,7 +230,6 @@ export default function BiblePanel({ open, onClose }) {
           <p className="mt-10 text-amber-400 font-semibold" style={{ fontSize: 'clamp(1rem, 2.2vw, 2rem)' }}>
             {reference}
           </p>
-          <p className="mt-2 text-gray-500 text-sm">{BIBLE_VERSION}</p>
 
           <div className="absolute top-4 right-4 flex gap-2">
             <button onClick={toggleFullscreen} className="p-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors" title="Tela cheia">
