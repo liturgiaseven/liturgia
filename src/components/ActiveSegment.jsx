@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, CheckCircle2, Lightbulb } from 'lucide-react
 import Icon from './Icon'
 import SegmentTimer from './SegmentTimer'
 import HymnPanel from './HymnPanel'
+import YoutubeField from './YoutubeField'
 
 export default function ActiveSegment({
   service,
@@ -49,6 +50,11 @@ export default function ActiveSegment({
 
       {/* Timer */}
       <SegmentTimer key={`${service.id}-${segment.id}`} segment={segment} />
+
+      {/* YouTube (em segmentos que usam vídeo) */}
+      {segment.hasYoutube && (
+        <YoutubeField segmentId={segment.id} />
+      )}
 
       {/* Hinos sugeridos (apenas em momentos musicais) */}
       {segment.hymnCategory && (

@@ -30,6 +30,7 @@ export const SERVICES = [
           'Tela cheia para o vídeo',
         ],
         icon: 'globe',
+        hasYoutube: true,
       },
       {
         id: 'es-classes',
@@ -75,6 +76,7 @@ export const SERVICES = [
           'Iluminação adequada para as crianças',
         ],
         icon: 'star',
+        hasYoutube: true,
       },
       {
         id: 'cd-louvor',
@@ -127,6 +129,7 @@ export const SERVICES = [
         ],
         icon: 'microphone',
         hymnCategory: 'especial',
+        hasYoutube: true,
       },
       {
         id: 'cd-sermao',
