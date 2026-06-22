@@ -25,26 +25,40 @@ export function buildServices(overrides) {
     const so = overrides[svc.id] || {}
     const segOv = so.segments || {}
 
-    let segs = svc.segments.map((seg) => ({
-      ...seg,
-      name: segOv[seg.id]?.name ?? seg.name,
-      duration: segOv[seg.id]?.duration ?? seg.duration,
-    }))
+    const baseById = Object.fromEntries(
+      svc.segments.map((seg) => [seg.id, {
+        ...seg,
+        name: segOv[seg.id]?.name ?? seg.name,
+        duration: segOv[seg.id]?.duration ?? seg.duration,
+      }])
+    )
 
+    let segs
     if (Array.isArray(so.order) && so.order.length) {
-      const byId = Object.fromEntries(segs.map((s) => [s.id, s]))
-      const ordered = []
+      const seen = new Set()
+      segs = []
       so.order.forEach((id) => {
-        if (byId[id]) {
-          ordered.push(byId[id])
-          delete byId[id]
+        if (baseById[id]) {
+          segs.push(baseById[id])
+          seen.add(id)
+        } else if (segOv[id]?._custom) {
+          segs.push({
+            id,
+            name: segOv[id].name ?? 'Segmento',
+            duration: segOv[id].duration ?? 5,
+            icon: 'star',
+            _custom: true,
+            hasYoutube: segOv[id].hasYoutube ?? false,
+            hasImages: segOv[id].hasImages ?? false,
+            hymnCategory: segOv[id].hasHymns ? 'especial' : undefined,
+          })
+          seen.add(id)
         }
       })
-      // segmentos novos (ainda não presentes na ordem salva) vão para o fim
-      segs.forEach((s) => {
-        if (byId[s.id]) ordered.push(s)
-      })
-      segs = ordered
+      // segmentos base novos (ainda não presentes na ordem salva) vão para o fim
+      svc.segments.forEach((s) => { if (!seen.has(s.id)) segs.push(baseById[s.id]) })
+    } else {
+      segs = Object.values(baseById)
     }
 
     return {
@@ -97,4 +111,46 @@ export function resetService(ov, serviceId) {
   const next = { ...ov }
   delete next[serviceId]
   return next
+}
+
+export function addSegment(ov, serviceId) {
+  const svc = BASE.find((s) => s.id === serviceId)
+  const id = `custom-${Date.now()}`
+  const so = ov[serviceId] || {}
+  const currentOrder = Array.isArray(so.order) && so.order.length
+    ? [...so.order]
+    : (svc?.segments.map((s) => s.id) || [])
+  return {
+    ...ov,
+    [serviceId]: {
+      ...so,
+      segments: {
+        ...(so.segments || {}),
+        [id]: { name: 'Novo segmento', duration: 5, _custom: true, hasYoutube: false, hasImages: false, hasHymns: false },
+      },
+      order: [...currentOrder, id],
+    },
+  }
+}
+
+export function setSegmentFeature(ov, serviceId, segId, key, value) {
+  return withSegment(ov, serviceId, segId, { [key]: value })
+}
+
+export function removeSegment(ov, serviceId, segId) {
+  const svc = BASE.find((s) => s.id === serviceId)
+  const so = ov[serviceId] || {}
+  const currentOrder = Array.isArray(so.order) && so.order.length
+    ? [...so.order]
+    : (svc?.segments.map((s) => s.id) || [])
+  const segments = { ...(so.segments || {}) }
+  delete segments[segId]
+  return {
+    ...ov,
+    [serviceId]: {
+      ...so,
+      segments,
+      order: currentOrder.filter((id) => id !== segId),
+    },
+  }
 }

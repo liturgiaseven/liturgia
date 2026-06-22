@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Icon from './Icon'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, X, Plus, Youtube, Image, Music } from 'lucide-react'
 
 const colorMap = {
   blue: {
@@ -23,6 +23,9 @@ export default function ServicePanel({
   onRename,
   onDuration,
   onReorder,
+  onAdd,
+  onRemove,
+  onFeature,
 }) {
   const colors = colorMap[service.color] ?? colorMap.blue
   const [dragIdx, setDragIdx] = useState(null)
@@ -72,9 +75,50 @@ export default function ServicePanel({
                 />
                 <span className="text-xs text-gray-500">min</span>
               </div>
+              {seg._custom && (
+                <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                  {[
+                    { key: 'hasYoutube', icon: Youtube, label: 'YT', active: seg.hasYoutube, color: 'red' },
+                    { key: 'hasImages',  icon: Image,   label: 'Img', active: seg.hasImages,  color: 'sky' },
+                    { key: 'hasHymns',  icon: Music,   label: 'Hinos', active: !!seg.hymnCategory, color: 'purple' },
+                  ].map(({ key, icon: Ic, label, active, color }) => (
+                    <button
+                      key={key}
+                      onClick={() => onFeature?.(seg.id, key, !active)}
+                      onDragStart={(e) => e.preventDefault()}
+                      title={active ? `Desativar ${label}` : `Ativar ${label}`}
+                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-semibold border transition-colors ${
+                        active
+                          ? color === 'red'    ? 'bg-red-900/40 text-red-400 border-red-700'
+                          : color === 'sky'    ? 'bg-sky-900/40 text-sky-400 border-sky-700'
+                          :                     'bg-purple-900/40 text-purple-400 border-purple-700'
+                          : 'bg-gray-900 text-gray-600 border-gray-700 hover:border-gray-500'
+                      }`}
+                    >
+                      <Ic className="w-3 h-3" />{label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+            {service.segments.length > 1 && (
+              <button
+                onClick={() => onRemove?.(seg.id)}
+                onDragStart={(e) => e.preventDefault()}
+                className="shrink-0 p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-gray-800 transition-colors"
+                title="Remover segmento"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         ))}
+        <button
+          onClick={() => onAdd?.()}
+          className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-gray-600 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:border-gray-400 transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Adicionar segmento
+        </button>
       </div>
     )
   }
