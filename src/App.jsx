@@ -8,8 +8,6 @@ import { BookOpen, Church } from 'lucide-react'
 export default function App() {
   const [serviceIdx, setServiceIdx] = useState(0)
   const [segmentIndex, setSegmentIndex] = useState(0)
-  const [timerRunning, setTimerRunning] = useState(false)
-  const [timerResetKey, setTimerResetKey] = useState(0)
 
   const service = SERVICES[serviceIdx]
   const segment = service.segments[segmentIndex]
@@ -17,33 +15,29 @@ export default function App() {
   function switchService(idx) {
     setServiceIdx(idx)
     setSegmentIndex(0)
-    setTimerRunning(false)
-    setTimerResetKey(k => k + 1)
   }
 
   function selectSegment(idx) {
     setSegmentIndex(idx)
-    setTimerRunning(false)
-    setTimerResetKey(k => k + 1)
   }
 
   function handleNext() {
-    if (segmentIndex < service.segments.length - 1) {
-      selectSegment(segmentIndex + 1)
-    }
+    if (segmentIndex < service.segments.length - 1) setSegmentIndex(s => s + 1)
   }
 
   function handlePrev() {
-    if (segmentIndex > 0) {
-      selectSegment(segmentIndex - 1)
-    }
+    if (segmentIndex > 0) setSegmentIndex(s => s - 1)
   }
 
-  const serviceTabClass = (idx) => {
+  const tabClass = (idx) => {
     const active = idx === serviceIdx
     const colors = {
-      0: active ? 'bg-blue-700 border-blue-600 text-white' : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-blue-800 hover:text-gray-200',
-      1: active ? 'bg-purple-700 border-purple-600 text-white' : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-purple-800 hover:text-gray-200',
+      0: active
+        ? 'bg-blue-700 border-blue-600 text-white'
+        : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-blue-800 hover:text-gray-200',
+      1: active
+        ? 'bg-purple-700 border-purple-600 text-white'
+        : 'bg-gray-900 border-gray-700 text-gray-400 hover:border-purple-800 hover:text-gray-200',
     }
     return `flex-1 flex flex-col items-center gap-1 py-3 px-4 rounded-xl border font-semibold text-sm transition-all cursor-pointer ${colors[idx]}`
   }
@@ -66,49 +60,37 @@ export default function App() {
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar: service selector + segment list */}
+        {/* Sidebar */}
         <aside className="w-72 shrink-0 flex flex-col gap-4 p-4 border-r border-gray-800 bg-gray-950 overflow-hidden">
-          {/* Service selector */}
           <div className="flex gap-2">
             {SERVICES.map((s, idx) => (
-              <button key={s.id} onClick={() => switchService(idx)} className={serviceTabClass(idx)}>
+              <button key={s.id} onClick={() => switchService(idx)} className={tabClass(idx)}>
                 <span className="text-xs font-bold uppercase tracking-wide">{s.shortName}</span>
                 <span className="text-xs opacity-75">{s.timeRange}</span>
               </button>
             ))}
           </div>
 
-          {/* Segment progress */}
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <BookOpen className="w-4 h-4" />
-            <span>
-              {service.name} — {segmentIndex + 1}/{service.segments.length}
-            </span>
+            <span>{service.name} — {segmentIndex + 1}/{service.segments.length}</span>
           </div>
 
-          {/* Segment list */}
           <div className="flex-1 overflow-y-auto scrollbar-thin">
-            <ServicePanel
-              service={service}
-              activeIndex={segmentIndex}
-              onSelect={selectSegment}
-            />
+            <ServicePanel service={service} activeIndex={segmentIndex} onSelect={selectSegment} />
           </div>
         </aside>
 
-        {/* Main area: active segment */}
+        {/* Main */}
         <main className="flex-1 p-5 overflow-y-auto scrollbar-thin">
           <ActiveSegment
-            key={`${serviceIdx}-${segmentIndex}-${timerResetKey}`}
+            key={`${serviceIdx}-${segmentIndex}`}
             service={service}
             segment={segment}
             segmentIndex={segmentIndex}
             totalSegments={service.segments.length}
-            timerRunning={timerRunning}
-            onTimerRunningChange={setTimerRunning}
             onPrev={handlePrev}
             onNext={handleNext}
-            onTimerReset={() => setTimerResetKey(k => k + 1)}
           />
         </main>
       </div>

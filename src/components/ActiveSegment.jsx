@@ -7,20 +7,13 @@ export default function ActiveSegment({
   segment,
   segmentIndex,
   totalSegments,
-  timerRunning,
-  onTimerRunningChange,
   onPrev,
   onNext,
-  onTimerReset,
 }) {
   const isFirst = segmentIndex === 0
   const isLast = segmentIndex === totalSegments - 1
 
-  const accentClass =
-    service.color === 'purple'
-      ? 'text-purple-400'
-      : 'text-blue-400'
-
+  const accentClass = service.color === 'purple' ? 'text-purple-400' : 'text-blue-400'
   const badgeClass =
     service.color === 'purple'
       ? 'bg-purple-900/50 text-purple-300 border-purple-800'
@@ -48,19 +41,13 @@ export default function ActiveSegment({
             </h2>
           </div>
         </div>
-
         <p className="text-gray-400 text-sm mt-4 leading-relaxed">
           {segment.description}
         </p>
       </div>
 
       {/* Timer */}
-      <SegmentTimer
-        segment={segment}
-        running={timerRunning}
-        onRunningChange={onTimerRunningChange}
-        onReset={onTimerReset}
-      />
+      <SegmentTimer key={`${service.id}-${segment.id}`} segment={segment} />
 
       {/* Tips */}
       {segment.tips?.length > 0 && (
