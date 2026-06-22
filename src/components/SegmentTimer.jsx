@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { formatDuration } from '../data/liturgy'
-import { Play, Pause, RotateCcw, Pencil, Check, Tv, Maximize2, X } from 'lucide-react'
+import { Play, Pause, RotateCcw, Pencil, Check, Tv } from 'lucide-react'
+import { openProjectionWindow, sendToProjection, clearProjection } from '../utils/projection'
 
 export default function SegmentTimer({ segment }) {
   const defaultDuration = (segment?.duration ?? 10) * 60
@@ -10,12 +11,10 @@ export default function SegmentTimer({ segment }) {
   const [editing, setEditing] = useState(false)
   const [editMin, setEditMin] = useState(segment?.duration ?? 10)
   const [editSec, setEditSec] = useState(0)
-  const [projecting, setProjecting] = useState(false)
+  const [projActive, setProjActive] = useState(false)
   const intervalRef = useRef(null)
   const remainingRef = useRef(defaultDuration)
-  const projRef = useRef(null)
 
-  // Reset when segment changes
   useEffect(() => {
     const secs = (segment?.duration ?? 10) * 60
     setTotalSecs(secs)
@@ -25,24 +24,20 @@ export default function SegmentTimer({ segment }) {
     setEditMin(segment?.duration ?? 10)
     setEditSec(0)
     setEditing(false)
-    setProjecting(false)
+    setProjActive(false)
   }, [segment?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Broadcast to projection window on every tick (when active)
   useEffect(() => {
-    if (!projecting) return
-    function onKey(e) {
-      if (e.key === 'Escape') { if (document.fullscreenElement) document.exitFullscreen?.(); setProjecting(false) }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [projecting])
-
-  function toggleProjFullscreen() {
-    const el = projRef.current
-    if (!el) return
-    if (!document.fullscreenElement) el.requestFullscreen?.()
-    else document.exitFullscreen?.()
-  }
+    if (!projActive) return
+    sendToProjection({
+      type: 'timer',
+      segmentName: segment?.name ?? '',
+      remaining,
+      totalSecs,
+      expired: remaining === 0,
+    })
+  }, [remaining, totalSecs, projActive]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (running) {
@@ -73,7 +68,7 @@ export default function SegmentTimer({ segment }) {
     const mins = Math.max(0, Math.min(180, Math.floor(Number(editMin) || 0)))
     const secs = Math.max(0, Math.min(59, Math.floor(Number(editSec) || 0)))
     let total = mins * 60 + secs
-    if (total < 1) total = 60 // mínimo de 1 segundo
+    if (total < 1) total = 60
     setEditMin(mins)
     setEditSec(secs)
     setTotalSecs(total)
@@ -88,37 +83,46 @@ export default function SegmentTimer({ segment }) {
     if (e.key === 'Escape') setEditing(false)
   }
 
+  function handleProjection() {
+    if (projActive) {
+      setProjActive(false)
+      clearProjection()
+    } else {
+      openProjectionWindow()
+      setProjActive(true)
+    }
+  }
+
   const progress = remaining / totalSecs
   const expired = remaining === 0
 
   const timeColor = expired
     ? 'text-red-400 animate-pulse'
-    : progress <= 0.25
-    ? 'text-red-400'
-    : progress <= 0.5
-    ? 'text-yellow-400'
+    : progress <= 0.25 ? 'text-red-400'
+    : progress <= 0.5  ? 'text-yellow-400'
     : 'text-emerald-400'
 
   const barColor = expired
     ? 'bg-red-500'
-    : progress <= 0.25
-    ? 'bg-red-500'
-    : progress <= 0.5
-    ? 'bg-yellow-500'
+    : progress <= 0.25 ? 'bg-red-500'
+    : progress <= 0.5  ? 'bg-yellow-500'
     : 'bg-emerald-500'
 
   return (
     <div className="bg-gray-900 rounded-2xl p-5 border border-gray-800">
-      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs uppercase tracking-widest text-gray-500 font-semibold">
           Contagem Regressiva
         </span>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setProjecting(true)}
-            className="p-1.5 rounded-lg text-gray-500 hover:text-amber-400 hover:bg-gray-800 transition-colors"
-            title="Projetar no telão"
+            onClick={handleProjection}
+            className={`p-1.5 rounded-lg transition-colors ${
+              projActive
+                ? 'text-amber-400 bg-amber-900/30 hover:bg-amber-900/50'
+                : 'text-gray-500 hover:text-amber-400 hover:bg-gray-800'
+            }`}
+            title={projActive ? 'Parar projeção' : 'Projetar no telão'}
           >
             <Tv className="w-4 h-4" />
           </button>
@@ -130,7 +134,7 @@ export default function SegmentTimer({ segment }) {
             <RotateCcw className="w-4 h-4" />
           </button>
           <button
-            onClick={() => !expired && setRunning(r => !r)}
+            onClick={() => !expired && setRunning((r) => !r)}
             disabled={expired}
             className={`px-4 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               running
@@ -143,17 +147,13 @@ export default function SegmentTimer({ segment }) {
         </div>
       </div>
 
-      {/* Time display */}
       <div className={`text-6xl font-mono font-bold tabular-nums text-center py-5 tracking-tight ${timeColor}`}>
         {expired ? '00:00' : formatDuration(remaining)}
       </div>
       {expired && (
-        <div className="text-center text-red-400 text-sm font-semibold -mt-2 mb-2">
-          Tempo esgotado!
-        </div>
+        <div className="text-center text-red-400 text-sm font-semibold -mt-2 mb-2">Tempo esgotado!</div>
       )}
 
-      {/* Progress bar — shrinks as time passes */}
       <div className="mt-1 mb-3">
         <div className="h-2.5 bg-gray-800 rounded-full overflow-hidden">
           <div
@@ -163,29 +163,19 @@ export default function SegmentTimer({ segment }) {
         </div>
       </div>
 
-      {/* Duration config */}
       <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
         <div className="flex items-center gap-1.5">
           {editing ? (
             <>
               <input
-                type="number"
-                min={0}
-                max={180}
-                value={editMin}
-                onChange={e => setEditMin(e.target.value)}
-                onKeyDown={handleEditKey}
-                autoFocus
+                type="number" min={0} max={180} value={editMin}
+                onChange={(e) => setEditMin(e.target.value)} onKeyDown={handleEditKey} autoFocus
                 className="w-14 bg-gray-800 border border-blue-500 rounded-md px-2 py-0.5 text-white text-xs text-center focus:outline-none"
               />
               <span>min</span>
               <input
-                type="number"
-                min={0}
-                max={59}
-                value={editSec}
-                onChange={e => setEditSec(e.target.value)}
-                onKeyDown={handleEditKey}
+                type="number" min={0} max={59} value={editSec}
+                onChange={(e) => setEditSec(e.target.value)} onKeyDown={handleEditKey}
                 className="w-14 bg-gray-800 border border-blue-500 rounded-md px-2 py-0.5 text-white text-xs text-center focus:outline-none"
               />
               <span>seg</span>
@@ -219,79 +209,6 @@ export default function SegmentTimer({ segment }) {
           {formatDuration(remaining)} restantes
         </span>
       </div>
-
-      {/* Projeção no telão */}
-      {projecting && (
-        <div
-          ref={projRef}
-          className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center px-[8%]"
-        >
-          <p className="text-gray-400 font-semibold uppercase tracking-widest mb-6"
-             style={{ fontSize: 'clamp(0.9rem, 2vw, 1.5rem)' }}>
-            {segment?.name}
-          </p>
-          <p
-            className={`font-mono font-bold tabular-nums ${
-              expired ? 'text-red-400 animate-pulse' : progress <= 0.25 ? 'text-red-400' : progress <= 0.5 ? 'text-yellow-400' : 'text-emerald-400'
-            }`}
-            style={{ fontSize: 'clamp(5rem, 22vw, 18rem)', lineHeight: 1 }}
-          >
-            {expired ? '00:00' : formatDuration(remaining)}
-          </p>
-          {expired && (
-            <p className="mt-6 text-red-400 font-bold animate-pulse"
-               style={{ fontSize: 'clamp(1rem, 3vw, 2.5rem)' }}>
-              Tempo esgotado!
-            </p>
-          )}
-
-          {/* Progress bar */}
-          <div className="mt-12 w-full max-w-2xl h-3 bg-white/10 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-1000 ${
-                expired ? 'bg-red-500' : progress <= 0.25 ? 'bg-red-500' : progress <= 0.5 ? 'bg-yellow-500' : 'bg-emerald-500'
-              }`}
-              style={{ width: `${progress * 100}%` }}
-            />
-          </div>
-
-          {/* Controls */}
-          <div className="absolute top-4 right-4 flex gap-2">
-            <button
-              onClick={toggleProjFullscreen}
-              className="p-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
-              title="Tela cheia"
-            >
-              <Maximize2 className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => { if (document.fullscreenElement) document.exitFullscreen?.(); setProjecting(false) }}
-              className="p-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
-              title="Fechar (Esc)"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Play/Pause inline */}
-          <div className="absolute bottom-8 flex gap-4">
-            <button
-              onClick={handleReset}
-              className="p-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
-              title="Reiniciar"
-            >
-              <RotateCcw className="w-6 h-6" />
-            </button>
-            <button
-              onClick={() => !expired && setRunning(r => !r)}
-              disabled={expired}
-              className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur font-semibold transition-colors disabled:opacity-40"
-            >
-              {running ? <><Pause className="w-5 h-5" /> Pausar</> : <><Play className="w-5 h-5" /> Iniciar</>}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

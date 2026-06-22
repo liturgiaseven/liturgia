@@ -1,23 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { BookMarked, X, Search, Maximize2, ChevronLeft, ChevronRight, Loader2, Tv } from 'lucide-react'
+import { BookMarked, X, Search, Loader2, Tv, ChevronLeft, ChevronRight } from 'lucide-react'
 import { loadBible, parseReference, BIBLE_VERSION } from '../data/bible'
+import { openProjectionWindow, sendToProjection, clearProjection } from '../utils/projection'
 
 export default function BiblePanel({ open, onClose }) {
   const [books, setBooks] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const [bookIndex, setBookIndex] = useState(42) // João por padrão
+  const [bookIndex, setBookIndex] = useState(42)
   const [chapter, setChapter] = useState(0)
   const [selStart, setSelStart] = useState(null)
   const [selEnd, setSelEnd] = useState(null)
   const [refInput, setRefInput] = useState('')
+  const [projActive, setProjActive] = useState(false)
 
-  const [projecting, setProjecting] = useState(false)
-  const projRef = useRef(null)
   const versesRef = useRef(null)
 
-  // Carrega a Bíblia ao abrir
   useEffect(() => {
     if (!open || books) return
     setLoading(true)
@@ -28,35 +27,20 @@ export default function BiblePanel({ open, onClose }) {
       .finally(() => setLoading(false))
   }, [open, books])
 
+  // Stop projecting when panel closes
+  useEffect(() => {
+    if (!open && projActive) {
+      setProjActive(false)
+      clearProjection()
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const book = books?.[bookIndex]
   const chapterVerses = book?.chapters?.[chapter] || []
 
-  function applyReference(text) {
-    if (!books) return
-    const parsed = parseReference(books, text)
-    if (!parsed) {
-      setError('Referência não encontrada. Ex.: João 3:16  ·  Sl 23  ·  1 Co 13:4-7')
-      return
-    }
-    setError(null)
-    setBookIndex(parsed.book.index)
-    setChapter(parsed.chapter)
-    setSelStart(parsed.verseStart)
-    setSelEnd(parsed.verseEnd ?? parsed.verseStart)
-    // rola até o versículo
-    setTimeout(() => {
-      const el = versesRef.current?.querySelector(`[data-v="${parsed.verseStart}"]`)
-      el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    }, 50)
-  }
-
-  function selectVerse(i) {
-    setSelStart(i)
-    setSelEnd(i)
-  }
-
-  // ----- Projeção -----
-  const reference = book ? `${book.name} ${chapter + 1}:${(selStart ?? 0) + 1}${selEnd != null && selEnd !== selStart ? '-' + (selEnd + 1) : ''}` : ''
+  const reference = book
+    ? `${book.name} ${chapter + 1}:${(selStart ?? 0) + 1}${selEnd != null && selEnd !== selStart ? '-' + (selEnd + 1) : ''}`
+    : ''
 
   const projText = (() => {
     if (selStart == null) return ''
@@ -65,7 +49,12 @@ export default function BiblePanel({ open, onClose }) {
     return chapterVerses.slice(a, b + 1).join(' ')
   })()
 
-  // Navegação versículo a versículo (atravessa capítulos/livros)
+  // Broadcast when verse or projActive changes
+  useEffect(() => {
+    if (!projActive || selStart == null || !projText) return
+    sendToProjection({ type: 'bible', text: projText, reference })
+  }, [projActive, projText, reference]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const moveVerse = useCallback((dir) => {
     if (!book || selStart == null) return
     let bi = bookIndex, ch = chapter, v = (selStart ?? 0) + dir
@@ -82,22 +71,48 @@ export default function BiblePanel({ open, onClose }) {
     setBookIndex(bi); setChapter(ch); setSelStart(v); setSelEnd(v)
   }, [book, bookIndex, chapter, selStart, books])
 
+  // Keyboard nav when projecting
   useEffect(() => {
-    if (!projecting) return
+    if (!projActive) return
     function onKey(e) {
-      if (e.key === 'Escape') { if (document.fullscreenElement) document.exitFullscreen?.(); setProjecting(false) }
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); moveVerse(1) }
       if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); moveVerse(-1) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [projecting, moveVerse])
+  }, [projActive, moveVerse])
 
-  function toggleFullscreen() {
-    const el = projRef.current
-    if (!el) return
-    if (!document.fullscreenElement) el.requestFullscreen?.()
-    else document.exitFullscreen?.()
+  function applyReference(text) {
+    if (!books) return
+    const parsed = parseReference(books, text)
+    if (!parsed) {
+      setError('Referência não encontrada. Ex.: João 3:16  ·  Sl 23  ·  1 Co 13:4-7')
+      return
+    }
+    setError(null)
+    setBookIndex(parsed.book.index)
+    setChapter(parsed.chapter)
+    setSelStart(parsed.verseStart)
+    setSelEnd(parsed.verseEnd ?? parsed.verseStart)
+    setTimeout(() => {
+      const el = versesRef.current?.querySelector(`[data-v="${parsed.verseStart}"]`)
+      el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 50)
+  }
+
+  function selectVerse(i) {
+    setSelStart(i)
+    setSelEnd(i)
+  }
+
+  function handleProject() {
+    if (projActive) {
+      setProjActive(false)
+      clearProjection()
+    } else {
+      openProjectionWindow()
+      setProjActive(true)
+    }
   }
 
   if (!open) return null
@@ -117,9 +132,14 @@ export default function BiblePanel({ open, onClose }) {
               <p className="text-[11px] text-gray-500">{BIBLE_VERSION}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {projActive && (
+              <span className="text-xs text-amber-400 font-semibold animate-pulse">● Projetando</span>
+            )}
+            <button onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -153,7 +173,6 @@ export default function BiblePanel({ open, onClose }) {
                 </button>
               </form>
 
-              {/* Seletores livro/capítulo */}
               <div className="flex gap-2">
                 <select
                   value={bookIndex}
@@ -177,7 +196,7 @@ export default function BiblePanel({ open, onClose }) {
               {error && <p className="text-xs text-red-400">{error}</p>}
             </div>
 
-            {/* Versículos do capítulo */}
+            {/* Versículos */}
             <div ref={versesRef} className="flex-1 overflow-y-auto scrollbar-thin px-5 py-3">
               {chapterVerses.map((v, i) => {
                 const a = Math.min(selStart ?? -1, selEnd ?? selStart ?? -1)
@@ -199,59 +218,47 @@ export default function BiblePanel({ open, onClose }) {
               })}
             </div>
 
-            {/* Rodapé: projetar */}
+            {/* Rodapé */}
             <div className="px-5 py-3 border-t border-gray-800 flex items-center justify-between gap-3">
-              <span className="text-sm text-gray-400 truncate">
-                {selStart != null ? <><span className="text-amber-400 font-semibold">{reference}</span> selecionado</> : 'Selecione um versículo'}
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => moveVerse(-1)}
+                  disabled={selStart == null}
+                  className="p-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Versículo anterior (←)"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-gray-400 truncate min-w-0">
+                  {selStart != null
+                    ? <><span className="text-amber-400 font-semibold">{reference}</span></>
+                    : 'Selecione um versículo'}
+                </span>
+                <button
+                  onClick={() => moveVerse(1)}
+                  disabled={selStart == null}
+                  className="p-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Próximo versículo (→)"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
               <button
-                onClick={() => selStart != null && setProjecting(true)}
+                onClick={handleProject}
                 disabled={selStart == null}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0 ${
+                  projActive
+                    ? 'bg-amber-700 hover:bg-amber-600 text-white'
+                    : 'bg-amber-600 hover:bg-amber-500 text-white'
+                }`}
               >
-                <Tv className="w-4 h-4" /> Projetar no telão
+                <Tv className="w-4 h-4" />
+                {projActive ? 'Parar projeção' : 'Projetar no telão'}
               </button>
             </div>
           </>
         ) : null}
       </div>
-
-      {/* Projeção / telão */}
-      {projecting && (
-        <div
-          ref={projRef}
-          className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center px-[8%] py-12"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <p className="text-white text-center font-serif leading-relaxed"
-             style={{ fontSize: 'clamp(1.5rem, 4.5vw, 4rem)' }}>
-            "{projText}"
-          </p>
-          <p className="mt-10 text-amber-400 font-semibold" style={{ fontSize: 'clamp(1rem, 2.2vw, 2rem)' }}>
-            {reference}
-          </p>
-
-          <div className="absolute top-4 right-4 flex gap-2">
-            <button onClick={toggleFullscreen} className="p-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors" title="Tela cheia">
-              <Maximize2 className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => { if (document.fullscreenElement) document.exitFullscreen?.(); setProjecting(false) }}
-              className="p-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
-              title="Fechar (Esc)"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <button onClick={() => moveVerse(-1)} className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors" title="Anterior (←)">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          <button onClick={() => moveVerse(1)} className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors" title="Próximo (→)">
-            <ChevronRight className="w-6 h-6" />
-          </button>
-        </div>
-      )}
     </div>
   )
 }
