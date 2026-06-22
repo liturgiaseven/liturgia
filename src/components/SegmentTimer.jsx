@@ -1,65 +1,94 @@
 import { useState, useEffect, useRef } from 'react'
 import { formatDuration } from '../data/liturgy'
-import { Play, Pause, RotateCcw } from 'lucide-react'
+import { Play, Pause, RotateCcw, Pencil, Check } from 'lucide-react'
 
-export default function SegmentTimer({ segment, running, onRunningChange, onReset }) {
-  const [elapsed, setElapsed] = useState(0)
-  const startRef = useRef(null)
-  const elapsedRef = useRef(0)
+export default function SegmentTimer({ segment }) {
+  const defaultDuration = (segment?.duration ?? 10) * 60
+  const [totalSecs, setTotalSecs] = useState(defaultDuration)
+  const [remaining, setRemaining] = useState(defaultDuration)
+  const [running, setRunning] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editMin, setEditMin] = useState(segment?.duration ?? 10)
+  const intervalRef = useRef(null)
+  const remainingRef = useRef(defaultDuration)
 
   // Reset when segment changes
   useEffect(() => {
-    setElapsed(0)
-    elapsedRef.current = 0
-    startRef.current = null
-    onRunningChange(false)
+    const secs = (segment?.duration ?? 10) * 60
+    setTotalSecs(secs)
+    setRemaining(secs)
+    remainingRef.current = secs
+    setRunning(false)
+    setEditMin(segment?.duration ?? 10)
+    setEditing(false)
   }, [segment?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (running) {
-      startRef.current = Date.now() - elapsedRef.current * 1000
+      intervalRef.current = setInterval(() => {
+        remainingRef.current -= 1
+        if (remainingRef.current <= 0) {
+          remainingRef.current = 0
+          setRemaining(0)
+          setRunning(false)
+          clearInterval(intervalRef.current)
+        } else {
+          setRemaining(remainingRef.current)
+        }
+      }, 1000)
+    } else {
+      clearInterval(intervalRef.current)
     }
+    return () => clearInterval(intervalRef.current)
   }, [running])
 
-  useEffect(() => {
-    if (!running) return
-    const id = setInterval(() => {
-      const secs = Math.floor((Date.now() - startRef.current) / 1000)
-      elapsedRef.current = secs
-      setElapsed(secs)
-    }, 500)
-    return () => clearInterval(id)
-  }, [running])
-
-  const handleReset = () => {
-    setElapsed(0)
-    elapsedRef.current = 0
-    startRef.current = running ? Date.now() : null
-    onReset?.()
+  function handleReset() {
+    setRunning(false)
+    setRemaining(totalSecs)
+    remainingRef.current = totalSecs
   }
 
-  const durationSecs = (segment?.duration ?? 10) * 60
-  const progress = Math.min(elapsed / durationSecs, 1)
-  const overTime = elapsed > durationSecs
-  const remaining = durationSecs - elapsed
+  function handleEditConfirm() {
+    const mins = Math.max(1, Math.min(180, Number(editMin) || 10))
+    const secs = mins * 60
+    setEditMin(mins)
+    setTotalSecs(secs)
+    setRemaining(secs)
+    remainingRef.current = secs
+    setRunning(false)
+    setEditing(false)
+  }
 
-  const progressColor = overTime
-    ? 'bg-red-500'
-    : progress > 0.85
-    ? 'bg-yellow-500'
-    : 'bg-emerald-500'
+  function handleEditKey(e) {
+    if (e.key === 'Enter') handleEditConfirm()
+    if (e.key === 'Escape') setEditing(false)
+  }
 
-  const timeColor = overTime
+  const progress = remaining / totalSecs
+  const expired = remaining === 0
+
+  const timeColor = expired
+    ? 'text-red-400 animate-pulse'
+    : progress <= 0.25
     ? 'text-red-400'
-    : progress > 0.85
+    : progress <= 0.5
     ? 'text-yellow-400'
     : 'text-emerald-400'
 
+  const barColor = expired
+    ? 'bg-red-500'
+    : progress <= 0.25
+    ? 'bg-red-500'
+    : progress <= 0.5
+    ? 'bg-yellow-500'
+    : 'bg-emerald-500'
+
   return (
     <div className="bg-gray-900 rounded-2xl p-5 border border-gray-800">
+      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs uppercase tracking-widest text-gray-500 font-semibold">
-          Cronômetro
+          Contagem Regressiva
         </span>
         <div className="flex items-center gap-2">
           <button
@@ -70,44 +99,78 @@ export default function SegmentTimer({ segment, running, onRunningChange, onRese
             <RotateCcw className="w-4 h-4" />
           </button>
           <button
-            onClick={() => onRunningChange(!running)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors ${
+            onClick={() => !expired && setRunning(r => !r)}
+            disabled={expired}
+            className={`px-4 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
               running
                 ? 'bg-gray-700 hover:bg-gray-600 text-white'
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white'
             }`}
           >
-            {running ? (
-              <><Pause className="w-4 h-4" /> Pausar</>
-            ) : (
-              <><Play className="w-4 h-4" /> Iniciar</>
-            )}
+            {running ? <><Pause className="w-4 h-4" /> Pausar</> : <><Play className="w-4 h-4" /> Iniciar</>}
           </button>
         </div>
       </div>
 
-      {/* Main time display */}
-      <div className={`text-5xl font-mono font-bold tabular-nums text-center py-4 ${timeColor}`}>
-        {formatDuration(elapsed)}
+      {/* Time display */}
+      <div className={`text-6xl font-mono font-bold tabular-nums text-center py-5 tracking-tight ${timeColor}`}>
+        {expired ? '00:00' : formatDuration(remaining)}
       </div>
+      {expired && (
+        <div className="text-center text-red-400 text-sm font-semibold -mt-2 mb-2">
+          Tempo esgotado!
+        </div>
+      )}
 
-      {/* Progress bar */}
-      <div className="mt-3 mb-2">
-        <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+      {/* Progress bar — shrinks as time passes */}
+      <div className="mt-1 mb-3">
+        <div className="h-2.5 bg-gray-800 rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-500 ${progressColor}`}
+            className={`h-full rounded-full transition-all duration-1000 ${barColor}`}
             style={{ width: `${progress * 100}%` }}
           />
         </div>
       </div>
 
-      {/* Duration info */}
-      <div className="flex justify-between text-xs text-gray-500 mt-1">
-        <span>Duração prevista: {segment?.duration ?? 0} min</span>
-        <span className={overTime ? 'text-red-400 font-semibold' : ''}>
-          {overTime
-            ? `+${formatDuration(elapsed - durationSecs)} acima`
-            : `${formatDuration(Math.max(remaining, 0))} restantes`}
+      {/* Duration config */}
+      <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+        <div className="flex items-center gap-1.5">
+          {editing ? (
+            <>
+              <input
+                type="number"
+                min={1}
+                max={180}
+                value={editMin}
+                onChange={e => setEditMin(e.target.value)}
+                onKeyDown={handleEditKey}
+                autoFocus
+                className="w-16 bg-gray-800 border border-blue-500 rounded-md px-2 py-0.5 text-white text-xs text-center focus:outline-none"
+              />
+              <span>min</span>
+              <button
+                onClick={handleEditConfirm}
+                className="ml-1 p-1 rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+                title="Confirmar"
+              >
+                <Check className="w-3 h-3" />
+              </button>
+            </>
+          ) : (
+            <>
+              <span>Duração: {Math.round(totalSecs / 60)} min</span>
+              <button
+                onClick={() => { setEditing(true); setRunning(false) }}
+                className="p-1 rounded hover:bg-gray-800 hover:text-gray-300 transition-colors"
+                title="Editar duração"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </>
+          )}
+        </div>
+        <span className={remaining === 0 ? 'text-red-400' : ''}>
+          {formatDuration(remaining)} restantes
         </span>
       </div>
     </div>
