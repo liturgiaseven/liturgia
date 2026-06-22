@@ -12,13 +12,18 @@ import {
 import Clock from './components/Clock'
 import ServicePanel from './components/ServicePanel'
 import ActiveSegment from './components/ActiveSegment'
-import { BookOpen, Church, Pencil, Check, RotateCcw } from 'lucide-react'
+import BiblePanel from './components/BiblePanel'
+import { BookOpen, Church, Pencil, Check, RotateCcw, BookMarked } from 'lucide-react'
+
+const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
+const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : ''
 
 export default function App() {
   const [overrides, setOverrides] = useState(loadOverrides)
   const [serviceIdx, setServiceIdx] = useState(0)
   const [selectedId, setSelectedId] = useState(null)
   const [editMode, setEditMode] = useState(false)
+  const [bibleOpen, setBibleOpen] = useState(false)
 
   const services = useMemo(() => buildServices(overrides), [overrides])
   const service = services[serviceIdx]
@@ -94,11 +99,25 @@ export default function App() {
           </div>
           <div>
             <div className="font-bold text-white text-base leading-tight">Liturgia IASD</div>
-            <div className="text-xs text-gray-500">Controlador de Mídia</div>
+            <div className="text-xs text-gray-500">
+              Controlador de Mídia · <span className="text-gray-400 font-mono">v{APP_VERSION}</span>
+              {BUILD_DATE && <span className="text-gray-600"> ({BUILD_DATE})</span>}
+            </div>
           </div>
         </div>
-        <Clock />
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setBibleOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm transition-colors"
+            title="Abrir Bíblia"
+          >
+            <BookMarked className="w-4 h-4" /> Bíblia
+          </button>
+          <Clock />
+        </div>
       </header>
+
+      <BiblePanel open={bibleOpen} onClose={() => setBibleOpen(false)} />
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
