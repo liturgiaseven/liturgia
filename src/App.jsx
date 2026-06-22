@@ -16,7 +16,6 @@ import BiblePanel from './components/BiblePanel'
 import { BookOpen, Church, Pencil, Check, RotateCcw, BookMarked } from 'lucide-react'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
-const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : ''
 
 export default function App() {
   const [overrides, setOverrides] = useState(loadOverrides)
@@ -101,7 +100,6 @@ export default function App() {
             <div className="font-bold text-white text-base leading-tight">Liturgia IASD</div>
             <div className="text-xs text-gray-500">
               Controlador de Mídia · <span className="text-gray-400 font-mono">v{APP_VERSION}</span>
-              {BUILD_DATE && <span className="text-gray-600"> ({BUILD_DATE})</span>}
             </div>
           </div>
         </div>
