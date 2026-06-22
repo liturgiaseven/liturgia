@@ -48,6 +48,9 @@ export function buildServices(overrides) {
             duration: segOv[id].duration ?? 5,
             icon: 'star',
             _custom: true,
+            hasYoutube: segOv[id].hasYoutube ?? false,
+            hasImages: segOv[id].hasImages ?? false,
+            hymnCategory: segOv[id].hasHymns ? 'especial' : undefined,
           })
           seen.add(id)
         }
@@ -121,10 +124,17 @@ export function addSegment(ov, serviceId) {
     ...ov,
     [serviceId]: {
       ...so,
-      segments: { ...(so.segments || {}), [id]: { name: 'Novo segmento', duration: 5, _custom: true } },
+      segments: {
+        ...(so.segments || {}),
+        [id]: { name: 'Novo segmento', duration: 5, _custom: true, hasYoutube: false, hasImages: false, hasHymns: false },
+      },
       order: [...currentOrder, id],
     },
   }
+}
+
+export function setSegmentFeature(ov, serviceId, segId, key, value) {
+  return withSegment(ov, serviceId, segId, { [key]: value })
 }
 
 export function removeSegment(ov, serviceId, segId) {

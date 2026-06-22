@@ -10,6 +10,7 @@ import {
   resetService,
   addSegment,
   removeSegment,
+  setSegmentFeature,
 } from './data/store'
 import Clock from './components/Clock'
 import ServicePanel from './components/ServicePanel'
@@ -77,6 +78,9 @@ export default function App() {
   function handleRemoveSegment(segId) {
     if (segment?.id === segId) selectSegment(Math.max(0, segmentIndex - 1))
     setOverrides((ov) => removeSegment(ov, service.id, segId))
+  }
+  function handleSegmentFeature(segId, key, value) {
+    setOverrides((ov) => setSegmentFeature(ov, service.id, segId, key, value))
   }
   function handleResetService() {
     if (window.confirm(`Restaurar a programação padrão de "${service.name}"? As edições de títulos, tempos e ordem serão perdidas.`)) {
@@ -196,6 +200,7 @@ export default function App() {
               onReorder={handleReorder}
               onAdd={handleAddSegment}
               onRemove={handleRemoveSegment}
+              onFeature={handleSegmentFeature}
             />
           </div>
 
