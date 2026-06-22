@@ -1,32 +1,74 @@
-import { useState } from 'react'
-import { SERVICES } from './data/liturgy'
+import { useState, useMemo, useEffect } from 'react'
+import {
+  loadOverrides,
+  saveOverrides,
+  buildServices,
+  renameSegment,
+  setSegmentDuration,
+  renameService,
+  setOrder,
+  resetService,
+} from './data/store'
 import Clock from './components/Clock'
 import ServicePanel from './components/ServicePanel'
 import ActiveSegment from './components/ActiveSegment'
-import { BookOpen, Church } from 'lucide-react'
+import { BookOpen, Church, Pencil, Check, RotateCcw } from 'lucide-react'
 
 export default function App() {
+  const [overrides, setOverrides] = useState(loadOverrides)
   const [serviceIdx, setServiceIdx] = useState(0)
-  const [segmentIndex, setSegmentIndex] = useState(0)
+  const [selectedId, setSelectedId] = useState(null)
+  const [editMode, setEditMode] = useState(false)
 
-  const service = SERVICES[serviceIdx]
+  const services = useMemo(() => buildServices(overrides), [overrides])
+  const service = services[serviceIdx]
+
+  // Garante um segmento selecionado válido
+  const segmentIndex = useMemo(() => {
+    const i = service.segments.findIndex((s) => s.id === selectedId)
+    return i >= 0 ? i : 0
+  }, [service, selectedId])
   const segment = service.segments[segmentIndex]
+
+  // Persiste overrides
+  useEffect(() => { saveOverrides(overrides) }, [overrides])
 
   function switchService(idx) {
     setServiceIdx(idx)
-    setSegmentIndex(0)
+    setSelectedId(services[idx].segments[0]?.id ?? null)
   }
 
   function selectSegment(idx) {
-    setSegmentIndex(idx)
+    setSelectedId(service.segments[idx]?.id ?? null)
   }
 
   function handleNext() {
-    if (segmentIndex < service.segments.length - 1) setSegmentIndex(s => s + 1)
+    if (segmentIndex < service.segments.length - 1) selectSegment(segmentIndex + 1)
+  }
+  function handlePrev() {
+    if (segmentIndex > 0) selectSegment(segmentIndex - 1)
   }
 
-  function handlePrev() {
-    if (segmentIndex > 0) setSegmentIndex(s => s - 1)
+  // ---- Edição ----
+  function handleRename(segId, name) {
+    setOverrides((ov) => renameSegment(ov, service.id, segId, name))
+  }
+  function handleDuration(segId, minutes) {
+    setOverrides((ov) => setSegmentDuration(ov, service.id, segId, minutes))
+  }
+  function handleReorder(fromIdx, toIdx) {
+    const ids = service.segments.map((s) => s.id)
+    const [moved] = ids.splice(fromIdx, 1)
+    ids.splice(toIdx, 0, moved)
+    setOverrides((ov) => setOrder(ov, service.id, ids))
+  }
+  function handleRenameService(name) {
+    setOverrides((ov) => renameService(ov, service.id, name))
+  }
+  function handleResetService() {
+    if (window.confirm(`Restaurar a programação padrão de "${service.name}"? As edições de títulos, tempos e ordem serão perdidas.`)) {
+      setOverrides((ov) => resetService(ov, service.id))
+    }
   }
 
   const tabClass = (idx) => {
@@ -61,9 +103,10 @@ export default function App() {
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-72 shrink-0 flex flex-col gap-4 p-4 border-r border-gray-800 bg-gray-950 overflow-hidden">
+        <aside className="w-72 shrink-0 flex flex-col gap-3 p-4 border-r border-gray-800 bg-gray-950 overflow-hidden">
+          {/* Service selector */}
           <div className="flex gap-2">
-            {SERVICES.map((s, idx) => (
+            {services.map((s, idx) => (
               <button key={s.id} onClick={() => switchService(idx)} className={tabClass(idx)}>
                 <span className="text-xs font-bold uppercase tracking-wide">{s.shortName}</span>
                 <span className="text-xs opacity-75">{s.timeRange}</span>
@@ -71,20 +114,74 @@ export default function App() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <BookOpen className="w-4 h-4" />
-            <span>{service.name} — {segmentIndex + 1}/{service.segments.length}</span>
+          {/* Barra de edição */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-gray-500 min-w-0">
+              <BookOpen className="w-4 h-4 shrink-0" />
+              <span className="truncate">
+                {editMode ? 'Editando programação' : `${service.name} — ${segmentIndex + 1}/${service.segments.length}`}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {editMode && (
+                <button
+                  onClick={handleResetService}
+                  className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"
+                  title="Restaurar padrão"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                onClick={() => setEditMode((e) => !e)}
+                className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg font-semibold transition-colors ${
+                  editMode
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                }`}
+                title={editMode ? 'Concluir edição' : 'Editar programação'}
+              >
+                {editMode ? <><Check className="w-3.5 h-3.5" /> Concluir</> : <><Pencil className="w-3.5 h-3.5" /> Editar</>}
+              </button>
+            </div>
           </div>
 
+          {/* Nome do culto editável */}
+          {editMode && (
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-widest text-gray-600">Nome do culto (aba)</label>
+              <input
+                value={service.shortName}
+                onChange={(e) => handleRenameService(e.target.value)}
+                className="bg-gray-950 border border-gray-700 rounded-md px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+          )}
+
+          {/* Segment list */}
           <div className="flex-1 overflow-y-auto scrollbar-thin">
-            <ServicePanel service={service} activeIndex={segmentIndex} onSelect={selectSegment} />
+            <ServicePanel
+              service={service}
+              activeIndex={segmentIndex}
+              onSelect={selectSegment}
+              editMode={editMode}
+              onRename={handleRename}
+              onDuration={handleDuration}
+              onReorder={handleReorder}
+            />
           </div>
+
+          {editMode && (
+            <p className="text-[11px] text-gray-600 leading-snug">
+              Arraste pelo ícone <span className="text-gray-400">⠿</span> para reordenar. Edite títulos e tempos diretamente. Tudo é salvo no navegador.
+            </p>
+          )}
         </aside>
 
         {/* Main */}
         <main className="flex-1 p-5 overflow-y-auto scrollbar-thin">
           <ActiveSegment
-            key={`${serviceIdx}-${segmentIndex}`}
+            key={`${service.id}-${segment.id}-${segment.duration}`}
             service={service}
             segment={segment}
             segmentIndex={segmentIndex}

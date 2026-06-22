@@ -130,6 +130,52 @@ export default function YoutubeField({ segmentId }) {
         </div>
       </div>
 
+      {/* Histórico (logo abaixo do cabeçalho, sempre visível ao abrir) */}
+      {showHistory && (
+        <div className="border-b border-gray-800 bg-gray-950/40 px-4 py-3 flex flex-col gap-2 max-h-64 overflow-y-auto scrollbar-thin">
+          {history.length === 0 ? (
+            <p className="text-xs text-gray-500 text-center py-2">Nenhum link usado ainda.</p>
+          ) : (
+            <>
+              <p className="text-xs text-gray-500">Clique para recarregar</p>
+              {history.map(entry => (
+                <div
+                  key={entry.videoId + entry.usedAt}
+                  className={`group flex items-center gap-3 rounded-xl border px-3 py-2 cursor-pointer transition-all ${
+                    activeId === entry.videoId
+                      ? 'border-red-600 bg-red-950/30'
+                      : 'border-gray-700 hover:border-gray-500 bg-gray-950/50 hover:bg-gray-800'
+                  }`}
+                  onClick={() => { setActiveId(entry.videoId); setShowHistory(false) }}
+                >
+                  <img
+                    src={thumbUrl(entry.videoId)}
+                    alt=""
+                    onError={e => { e.currentTarget.style.visibility = 'hidden' }}
+                    className="w-20 h-12 rounded-lg object-cover shrink-0 bg-gray-800"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-gray-200 truncate">
+                      {entry.label || entry.url}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5 truncate">
+                      {entry.label ? entry.url : formatDate(entry.usedAt)}
+                    </div>
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); removeFromHistory(entry.videoId) }}
+                    className="shrink-0 p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-700 transition-colors"
+                    title="Remover do histórico"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Player */}
       {activeId ? (
         <div className="relative">
@@ -180,45 +226,6 @@ export default function YoutubeField({ segmentId }) {
             />
           )}
         </form>
-      )}
-
-      {/* Histórico */}
-      {showHistory && history.length > 0 && (
-        <div className="border-t border-gray-800 px-4 pb-4 pt-3 flex flex-col gap-2 max-h-72 overflow-y-auto scrollbar-thin">
-          <p className="text-xs text-gray-500 mb-1">Clique para recarregar</p>
-          {history.map(entry => (
-            <div
-              key={entry.videoId + entry.usedAt}
-              className={`group flex items-center gap-3 rounded-xl border px-3 py-2 cursor-pointer transition-all ${
-                activeId === entry.videoId
-                  ? 'border-red-600 bg-red-950/30'
-                  : 'border-gray-700 hover:border-gray-500 bg-gray-950/50 hover:bg-gray-800'
-              }`}
-              onClick={() => { setActiveId(entry.videoId); setShowHistory(false) }}
-            >
-              <img
-                src={thumbUrl(entry.videoId)}
-                alt=""
-                className="w-20 h-12 rounded-lg object-cover shrink-0 bg-gray-800"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-gray-200 truncate">
-                  {entry.label || entry.url}
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5 truncate">
-                  {entry.label ? entry.url : ''} · {formatDate(entry.usedAt)}
-                </div>
-              </div>
-              <button
-                onClick={e => { e.stopPropagation(); removeFromHistory(entry.videoId) }}
-                className="shrink-0 p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-gray-700 opacity-0 group-hover:opacity-100 transition-all"
-                title="Remover do histórico"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
       )}
     </div>
   )
