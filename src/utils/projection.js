@@ -1,17 +1,21 @@
 const CHANNEL_NAME = 'liturgia-projection'
 const LS_KEY = 'liturgia.proj-state'
 
-// Singleton channel — initialized at module load so it's always listening
 const _channel = new BroadcastChannel(CHANNEL_NAME)
 let _projWin = null
+let _navHandler = null
 
-// When projection window signals ready, re-send last known state
+export function registerNavHandler(fn) { _navHandler = fn }
+export function unregisterNavHandler() { _navHandler = null }
+
 _channel.onmessage = (e) => {
   if (e.data?.type === 'ready') {
     try {
       const last = localStorage.getItem(LS_KEY)
       if (last) _channel.postMessage(JSON.parse(last))
     } catch {}
+  } else if (e.data?.type === 'nav') {
+    _navHandler?.(e.data.direction)
   }
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Maximize2, Minimize2 } from 'lucide-react'
+import { Maximize2, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const CHANNEL_NAME = 'liturgia-projection'
 const LS_KEY = 'liturgia.proj-state'
@@ -19,15 +19,18 @@ export default function ProjectionView() {
   const [state, setState] = useState(loadInitial)
   const [showUI, setShowUI] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [started, setStarted] = useState(false)
+  const channelRef = useRef(null)
   const hideRef = useRef(null)
 
   useEffect(() => {
     const ch = new BroadcastChannel(CHANNEL_NAME)
+    channelRef.current = ch
     ch.onmessage = (e) => {
       if (e.data && e.data.type !== 'ready') setState(e.data)
     }
     ch.postMessage({ type: 'ready' })
-    return () => ch.close()
+    return () => { ch.close(); channelRef.current = null }
   }, [])
 
   useEffect(() => {
@@ -35,6 +38,11 @@ export default function ProjectionView() {
     document.addEventListener('fullscreenchange', onFs)
     return () => document.removeEventListener('fullscreenchange', onFs)
   }, [])
+
+  function handleStart() {
+    document.documentElement.requestFullscreen?.().catch(() => {})
+    setStarted(true)
+  }
 
   function onMouseMove() {
     setShowUI(true)
@@ -45,6 +53,24 @@ export default function ProjectionView() {
   function toggleFullscreen() {
     if (!document.fullscreenElement) document.documentElement.requestFullscreen?.()
     else document.exitFullscreen?.()
+  }
+
+  function sendNav(dir) {
+    channelRef.current?.postMessage({ type: 'nav', direction: dir })
+  }
+
+  // Fullscreen entry screen
+  if (!started) {
+    return (
+      <div
+        className="w-screen h-screen bg-black flex flex-col items-center justify-center gap-6 cursor-pointer select-none"
+        onClick={handleStart}
+      >
+        <Maximize2 className="w-16 h-16 text-white/20" />
+        <p className="text-white/40 text-lg font-semibold">Clique para abrir em tela cheia</p>
+        <p className="text-white/20 text-sm">Arraste esta janela para o monitor do telão primeiro</p>
+      </div>
+    )
   }
 
   const { type } = state
@@ -59,12 +85,11 @@ export default function ProjectionView() {
         <p className="text-gray-800 text-sm select-none">aguardando conteúdo…</p>
       )}
       {type === 'timer' && <TimerSlide state={state} />}
-      {type === 'bible' && <BibleSlide state={state} />}
-      {type === 'hymn'  && <HymnSlide  state={state} />}
+      {type === 'bible' && <BibleSlide state={state} onNav={sendNav} showUI={showUI} />}
+      {type === 'hymn'  && <HymnSlide  state={state} onNav={sendNav} showUI={showUI} />}
 
-      <div
-        className={`absolute top-4 right-4 transition-opacity duration-500 ${showUI ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-      >
+      {/* Fullscreen toggle */}
+      <div className={`absolute top-4 right-4 transition-opacity duration-500 ${showUI ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <button
           onClick={toggleFullscreen}
           className="p-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
@@ -109,19 +134,17 @@ function TimerSlide({ state }) {
         </p>
       )}
       <div className="w-full max-w-2xl h-3 bg-white/10 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-1000 ${barColor}`}
-          style={{ width: `${progress * 100}%` }}
-        />
+        <div className={`h-full rounded-full transition-all duration-1000 ${barColor}`}
+             style={{ width: `${progress * 100}%` }} />
       </div>
     </div>
   )
 }
 
-function BibleSlide({ state }) {
+function BibleSlide({ state, onNav, showUI }) {
   const { text, reference } = state
   return (
-    <div className="flex flex-col items-center gap-8 px-[10%] w-full">
+    <div className="flex flex-col items-center gap-8 px-[12%] w-full">
       <p className="text-white text-center leading-relaxed"
          style={{ fontSize: 'clamp(1.5rem, 4.5vw, 4rem)', fontFamily: 'Georgia, serif' }}>
         "{text}"
@@ -129,14 +152,32 @@ function BibleSlide({ state }) {
       <p className="text-amber-400 font-semibold" style={{ fontSize: 'clamp(1rem, 2.2vw, 2rem)' }}>
         {reference}
       </p>
+
+      {/* Nav arrows */}
+      <div className={`absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-4 pointer-events-none transition-opacity duration-500 ${showUI ? 'opacity-100' : 'opacity-0'}`}>
+        <button
+          onClick={() => onNav(-1)}
+          className="pointer-events-auto p-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
+          title="Versículo anterior"
+        >
+          <ChevronLeft className="w-7 h-7" />
+        </button>
+        <button
+          onClick={() => onNav(1)}
+          className="pointer-events-auto p-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
+          title="Próximo versículo"
+        >
+          <ChevronRight className="w-7 h-7" />
+        </button>
+      </div>
     </div>
   )
 }
 
-function HymnSlide({ state }) {
+function HymnSlide({ state, onNav, showUI }) {
   const { title, number, stanza, stanzaIndex, totalStanzas } = state
   return (
-    <div className="flex flex-col items-center gap-8 px-[10%] w-full">
+    <div className="flex flex-col items-center gap-8 px-[12%] w-full">
       <p className="text-gray-500 font-semibold uppercase tracking-widest text-center"
          style={{ fontSize: 'clamp(0.75rem, 1.5vw, 1.2rem)' }}>
         {number ? `Nº ${number} · ` : ''}{title}
@@ -146,6 +187,28 @@ function HymnSlide({ state }) {
          style={{ fontSize: 'clamp(1.5rem, 4vw, 3.5rem)', fontFamily: 'Georgia, serif' }}>
         {stanza}
       </p>
+
+      {/* Nav arrows (shown on hover) */}
+      {totalStanzas > 1 && (
+        <div className={`absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-4 pointer-events-none transition-opacity duration-500 ${showUI ? 'opacity-100' : 'opacity-0'}`}>
+          <button
+            onClick={() => onNav(-1)}
+            disabled={stanzaIndex === 0}
+            className="pointer-events-auto p-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Estrofe anterior"
+          >
+            <ChevronLeft className="w-7 h-7" />
+          </button>
+          <button
+            onClick={() => onNav(1)}
+            disabled={stanzaIndex === totalStanzas - 1}
+            className="pointer-events-auto p-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Próxima estrofe"
+          >
+            <ChevronRight className="w-7 h-7" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
