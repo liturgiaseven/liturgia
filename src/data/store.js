@@ -42,7 +42,7 @@ export function buildServices(overrides) {
           segs.push(baseById[id])
           seen.add(id)
         } else if (segOv[id]?._custom) {
-          // features are stored in so.segmentFeatures[id]; fall back to legacy segOv[id] fields
+          // features stored in so.segmentFeatures[id]; fall back to legacy segOv[id] fields
           const f = (so.segmentFeatures || {})[id] || {}
           const fLeg = segOv[id]
           segs.push({
