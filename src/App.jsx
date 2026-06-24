@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   loadOverrides,
   saveOverrides,
+  syncOverridesFromCloud,
   buildServices,
   renameSegment,
   setSegmentDuration,
@@ -16,8 +17,9 @@ import Clock from './components/Clock'
 import ServicePanel from './components/ServicePanel'
 import ActiveSegment from './components/ActiveSegment'
 import BiblePanel from './components/BiblePanel'
-import { BookOpen, Church, Pencil, Check, RotateCcw, BookMarked, RefreshCw } from 'lucide-react'
+import { BookOpen, Church, Pencil, Check, RotateCcw, BookMarked, RefreshCw, Cloud } from 'lucide-react'
 import { useVersionCheck } from './hooks/useVersionCheck'
+import { logServiceSession } from './lib/serviceHistory'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
 
@@ -28,6 +30,8 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [editMode, setEditMode] = useState(false)
   const [bibleOpen, setBibleOpen] = useState(false)
+  const [syncStatus, setSyncStatus] = useState('idle') // idle | syncing | synced | error
+  const loggedRef = useRef(new Set())
 
   const services = useMemo(() => buildServices(overrides), [overrides])
   const service = services[serviceIdx]
@@ -39,8 +43,30 @@ export default function App() {
   }, [service, selectedId])
   const segment = service.segments[segmentIndex]
 
-  // Persiste overrides
+  // Persiste overrides (localStorage + cloud)
   useEffect(() => { saveOverrides(overrides) }, [overrides])
+
+  // On mount: pull config from cloud and merge (cloud wins over stale local data)
+  useEffect(() => {
+    setSyncStatus('syncing')
+    syncOverridesFromCloud().then((cloudData) => {
+      if (cloudData && Object.keys(cloudData).length > 0) {
+        setOverrides(cloudData)
+        try { localStorage.setItem('liturgia.layout.v1', JSON.stringify(cloudData)) } catch {}
+        setSyncStatus('synced')
+      } else {
+        setSyncStatus('idle')
+      }
+    }).catch(() => setSyncStatus('error'))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Log service history once per service per app session
+  useEffect(() => {
+    if (!loggedRef.current.has(service.id)) {
+      loggedRef.current.add(service.id)
+      logServiceSession(service)
+    }
+  }, [service])
 
   function switchService(idx) {
     setServiceIdx(idx)
@@ -126,6 +152,16 @@ export default function App() {
           >
             <BookMarked className="w-4 h-4" /> Bíblia
           </button>
+          {syncStatus === 'syncing' && (
+            <span title="Sincronizando com a nuvem…" className="text-gray-600">
+              <Cloud className="w-4 h-4 animate-pulse" />
+            </span>
+          )}
+          {syncStatus === 'synced' && (
+            <span title="Config sincronizada da nuvem" className="text-emerald-500">
+              <Cloud className="w-4 h-4" />
+            </span>
+          )}
           <Clock />
         </div>
       </header>

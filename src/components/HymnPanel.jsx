@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Music2, X, Pencil, Check, Plus, Trash2, Tv, ChevronLeft, ChevronRight } from 'lucide-react'
 import { HYMNS, HYMN_CATEGORIES } from '../data/hymns'
 import { openProjectionWindow, sendToProjection, clearProjection, registerNavHandler, unregisterNavHandler } from '../utils/projection'
+import { loadAllHymnLyricsFromCloud, saveHymnLyricsToCloud } from '../lib/hymnCloud'
 
 const LS_KEY = 'liturgia.hymns.v1'
 
@@ -39,6 +40,18 @@ export default function HymnPanel({ category, accent }) {
 
   // Keep a ref to stanzas length for nav handler closure
   const stanzasRef = useRef([])
+
+  // On mount: pull all hymn lyrics from cloud and merge into local store
+  useEffect(() => {
+    loadAllHymnLyricsFromCloud().then((cloudLyrics) => {
+      if (Object.keys(cloudLyrics).length === 0) return
+      setStore((prev) => {
+        const merged = { ...prev, ...cloudLyrics }
+        saveStore(merged)
+        return merged
+      })
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setOpenId(null)
@@ -130,6 +143,7 @@ export default function HymnPanel({ category, accent }) {
     const next = { ...store, [openId]: draft }
     setStore(next)
     saveStore(next)
+    saveHymnLyricsToCloud(openId, draft)
     setEditing(false)
     setStanzaIdx(0)
   }
