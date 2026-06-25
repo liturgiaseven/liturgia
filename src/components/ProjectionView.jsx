@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Maximize2, Minimize2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useChurchLogo } from '../hooks/useChurchLogo'
 
 const CHANNEL_NAME = 'liturgia-projection'
 const LS_KEY = 'liturgia.proj-state'
@@ -21,6 +22,7 @@ export default function ProjectionView() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [started, setStarted] = useState(false)
   const channelRef = useRef(null)
+  const { logoUrl } = useChurchLogo()
   const hideRef = useRef(null)
 
   useEffect(() => {
@@ -82,11 +84,32 @@ export default function ProjectionView() {
       onMouseMove={onMouseMove}
     >
       {type === 'clear' && (
-        <p className="text-gray-800 text-sm select-none">aguardando conteúdo…</p>
+        <div className="flex flex-col items-center justify-center gap-6 select-none">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt="Logo da Igreja"
+              className="max-w-[40vw] max-h-[40vh] object-contain drop-shadow-2xl"
+            />
+          ) : (
+            <p className="text-gray-800 text-sm">aguardando conteúdo…</p>
+          )}
+        </div>
       )}
       {type === 'timer' && <TimerSlide state={state} />}
       {type === 'bible' && <BibleSlide state={state} onNav={sendNav} showUI={showUI} />}
       {type === 'hymn'  && <HymnSlide  state={state} onNav={sendNav} showUI={showUI} />}
+
+      {/* Logo watermark em apresentações ativas */}
+      {type !== 'clear' && logoUrl && (
+        <div className="absolute bottom-4 right-6 pointer-events-none select-none">
+          <img
+            src={logoUrl}
+            alt=""
+            className="h-10 object-contain opacity-20"
+          />
+        </div>
+      )}
 
       {/* Fullscreen toggle */}
       <div className={`absolute top-4 right-4 transition-opacity duration-500 ${showUI ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>

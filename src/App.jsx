@@ -17,9 +17,11 @@ import Clock from './components/Clock'
 import ServicePanel from './components/ServicePanel'
 import ActiveSegment from './components/ActiveSegment'
 import BiblePanel from './components/BiblePanel'
-import { BookOpen, Church, Pencil, Check, RotateCcw, BookMarked, RefreshCw, Cloud } from 'lucide-react'
+import { BookOpen, Church, Pencil, Check, RotateCcw, BookMarked, RefreshCw, Cloud, ImagePlus } from 'lucide-react'
 import { useVersionCheck } from './hooks/useVersionCheck'
 import { logServiceSession } from './lib/serviceHistory'
+import { useChurchLogo } from './hooks/useChurchLogo'
+import { uploadChurchLogo } from './lib/churchLogo'
 
 const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'
 
@@ -31,7 +33,10 @@ export default function App() {
   const [editMode, setEditMode] = useState(false)
   const [bibleOpen, setBibleOpen] = useState(false)
   const [syncStatus, setSyncStatus] = useState('idle') // idle | syncing | synced | error
+  const [logoUploading, setLogoUploading] = useState(false)
+  const logoInputRef = useRef(null)
   const loggedRef = useRef(new Set())
+  const { logoUrl, updateLogo } = useChurchLogo()
 
   const services = useMemo(() => buildServices(overrides), [overrides])
   const service = services[serviceIdx]
@@ -116,6 +121,21 @@ export default function App() {
     }
   }
 
+  async function handleLogoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoUploading(true)
+    try {
+      const url = await uploadChurchLogo(file)
+      updateLogo(url)
+    } catch (err) {
+      alert('Erro ao enviar logo: ' + err.message)
+    } finally {
+      setLogoUploading(false)
+      e.target.value = ''
+    }
+  }
+
   const tabClass = (idx) => {
     const active = idx === serviceIdx
     const colors = {
@@ -134,11 +154,38 @@ export default function App() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-gray-950 shrink-0">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-church-700 flex items-center justify-center">
-            <Church className="w-5 h-5 text-church-200" />
+          <div className="relative group">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Logo da Igreja"
+                className="w-14 h-14 rounded-xl object-contain bg-gray-900 border border-gray-800"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-church-700 flex items-center justify-center">
+                <Church className="w-7 h-7 text-church-200" />
+              </div>
+            )}
+            <button
+              onClick={() => logoInputRef.current?.click()}
+              disabled={logoUploading}
+              title="Trocar logo da igreja"
+              className="absolute inset-0 rounded-xl bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+            >
+              {logoUploading
+                ? <RefreshCw className="w-4 h-4 text-white animate-spin" />
+                : <ImagePlus className="w-4 h-4 text-white" />}
+            </button>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
           </div>
           <div>
-            <div className="font-bold text-white text-base leading-tight">Liturgia IASD</div>
+            <div className="font-bold text-white text-base leading-tight">Liturgia</div>
             <div className="text-xs text-gray-500">
               Controlador de Mídia · <span className="text-gray-400 font-mono">v{APP_VERSION}</span>
             </div>
