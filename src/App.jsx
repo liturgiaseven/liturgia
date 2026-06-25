@@ -159,11 +159,11 @@ export default function App() {
               <img
                 src={logoUrl}
                 alt="Logo da Igreja"
-                className="w-9 h-9 rounded-xl object-contain bg-gray-900 border border-gray-800"
+                className="w-14 h-14 rounded-xl object-contain bg-gray-900 border border-gray-800"
               />
             ) : (
-              <div className="w-9 h-9 rounded-xl bg-church-700 flex items-center justify-center">
-                <Church className="w-5 h-5 text-church-200" />
+              <div className="w-14 h-14 rounded-xl bg-church-700 flex items-center justify-center">
+                <Church className="w-7 h-7 text-church-200" />
               </div>
             )}
             <button
@@ -185,7 +185,7 @@ export default function App() {
             />
           </div>
           <div>
-            <div className="font-bold text-white text-base leading-tight">Liturgia IASD</div>
+            <div className="font-bold text-white text-base leading-tight">Liturgia</div>
             <div className="text-xs text-gray-500">
               Controlador de Mídia · <span className="text-gray-400 font-mono">v{APP_VERSION}</span>
             </div>
