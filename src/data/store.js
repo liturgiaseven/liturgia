@@ -1,4 +1,5 @@
 import { SERVICES as BASE } from './liturgy'
+import { supabase } from '../lib/supabase'
 
 const LS_KEY = 'liturgia.layout.v1'
 
@@ -13,8 +14,26 @@ export function loadOverrides() {
 export function saveOverrides(ov) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(ov))
+  } catch { /* ignore */ }
+  // Async cloud sync — fire and forget, offline-safe
+  supabase
+    .from('liturgia_config')
+    .upsert({ id: 'main', data: ov, updated_at: new Date().toISOString() })
+    .then(({ error }) => { if (error) console.warn('[supabase] config sync:', error.message) })
+}
+
+// Returns cloud overrides merged with local (cloud wins on conflict)
+export async function syncOverridesFromCloud() {
+  try {
+    const { data, error } = await supabase
+      .from('liturgia_config')
+      .select('data, updated_at')
+      .eq('id', 'main')
+      .maybeSingle()
+    if (error || !data) return null
+    return data.data
   } catch {
-    /* ignora */
+    return null
   }
 }
 
