@@ -4,6 +4,7 @@ import SegmentTimer from './SegmentTimer'
 import HymnPanel from './HymnPanel'
 import YoutubeField from './YoutubeField'
 import ImageField from './ImageField'
+import SermonSlides from './SermonSlides'
 
 export default function ActiveSegment({
   service,
@@ -65,6 +66,11 @@ export default function ActiveSegment({
       {/* Hinos sugeridos (apenas em momentos musicais) */}
       {segment.hymnCategory && (
         <HymnPanel category={segment.hymnCategory} accent={accentClass} />
+      )}
+
+      {/* Slides do pregador (PDF) */}
+      {segment.hasSlides && (
+        <SermonSlides slideKey={`${service.id}:${segment.id}`} accent={accentClass} />
       )}
 
       {/* Tips */}

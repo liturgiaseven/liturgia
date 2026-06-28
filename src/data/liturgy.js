@@ -146,6 +146,7 @@ export const SERVICES = [
           'Timer visível para o pregador (opcional)',
         ],
         icon: 'book-open',
+        hasSlides: true,
       },
       {
         id: 'cd-apelo',
