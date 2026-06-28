@@ -99,9 +99,10 @@ export default function ProjectionView() {
       {type === 'timer' && <TimerSlide state={state} />}
       {type === 'bible' && <BibleSlide state={state} onNav={sendNav} showUI={showUI} />}
       {type === 'hymn'  && <HymnSlide  state={state} onNav={sendNav} showUI={showUI} />}
+      {type === 'slides' && <SlidesSlide state={state} onNav={sendNav} showUI={showUI} />}
 
       {/* Logo watermark em apresentações ativas */}
-      {type !== 'clear' && logoUrl && (
+      {type !== 'clear' && type !== 'slides' && logoUrl && (
         <div className="absolute bottom-4 right-6 pointer-events-none select-none">
           <img
             src={logoUrl}
@@ -159,6 +160,38 @@ function TimerSlide({ state }) {
       <div className="w-full max-w-2xl h-3 bg-white/10 rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all duration-1000 ${barColor}`}
              style={{ width: `${progress * 100}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function SlidesSlide({ state, onNav, showUI }) {
+  const { url, page } = state
+  const src = `${url}#page=${page || 1}&toolbar=0&navpanes=0&view=Fit`
+  return (
+    <div className="absolute inset-0 bg-black">
+      <iframe
+        key={page}
+        src={src}
+        title="Slides"
+        className="w-full h-full border-0"
+      />
+      {/* Nav arrows */}
+      <div className={`absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-4 pointer-events-none transition-opacity duration-500 ${showUI ? 'opacity-100' : 'opacity-0'}`}>
+        <button
+          onClick={() => onNav(-1)}
+          className="pointer-events-auto p-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
+          title="Slide anterior"
+        >
+          <ChevronLeft className="w-7 h-7" />
+        </button>
+        <button
+          onClick={() => onNav(1)}
+          className="pointer-events-auto p-3 rounded-full bg-white/10 text-white hover:bg-white/20 backdrop-blur transition-colors"
+          title="Próximo slide"
+        >
+          <ChevronRight className="w-7 h-7" />
+        </button>
       </div>
     </div>
   )
