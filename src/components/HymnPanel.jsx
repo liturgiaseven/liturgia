@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Music2, X, Pencil, Check, Plus, Trash2, Tv, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Music2, X, Pencil, Check, Plus, Trash2, Tv, ChevronLeft, ChevronRight, Upload, Play, Pause, Volume2 } from 'lucide-react'
 import { HYMNS, HYMN_CATEGORIES } from '../data/hymns'
 import { openProjectionWindow, sendToProjection, clearProjection, registerNavHandler, unregisterNavHandler } from '../utils/projection'
 import { loadAllHymnLyricsFromCloud, saveHymnLyricsToCloud } from '../lib/hymnCloud'
+import { loadAllHymnAudio, uploadHymnAudio, removeHymnAudio } from '../lib/hymnAudio'
 
 const LS_KEY = 'liturgia.hymns.v1'
 
@@ -37,9 +38,19 @@ export default function HymnPanel({ category, accent }) {
   const [draft, setDraft] = useState('')
   const [stanzaIdx, setStanzaIdx] = useState(0)
   const [projActive, setProjActive] = useState(false)
+  const [audioMap, setAudioMap] = useState({})
+  const [audioUploading, setAudioUploading] = useState(false)
+  const [audioPlaying, setAudioPlaying] = useState(false)
+  const audioRef = useRef(null)
+  const audioInputRef = useRef(null)
 
   // Keep a ref to stanzas length for nav handler closure
   const stanzasRef = useRef([])
+
+  // On mount: pull all hymn audio urls from cloud
+  useEffect(() => {
+    loadAllHymnAudio().then(setAudioMap)
+  }, [])
 
   // On mount: pull all hymn lyrics from cloud and merge into local store
   useEffect(() => {
@@ -121,6 +132,7 @@ export default function HymnPanel({ category, accent }) {
   }, [projActive, stanzaIdx, openId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function openModal(h) {
+    stopAudio()
     setOpenId(h.id)
     setEditing(false)
     setDraft(lyricsOf(h))
@@ -131,7 +143,46 @@ export default function HymnPanel({ category, accent }) {
   function closeModal() {
     setOpenId(null)
     setEditing(false)
+    stopAudio()
     if (projActive) { clearProjection(); setProjActive(false); unregisterNavHandler() }
+  }
+
+  function stopAudio() {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
+    setAudioPlaying(false)
+  }
+
+  function toggleAudio() {
+    const el = audioRef.current
+    if (!el) return
+    if (el.paused) { el.play(); setAudioPlaying(true) }
+    else { el.pause(); setAudioPlaying(false) }
+  }
+
+  async function handleAudioUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file || !openId) return
+    setAudioUploading(true)
+    try {
+      const url = await uploadHymnAudio(openId, file)
+      setAudioMap((m) => ({ ...m, [openId]: url }))
+    } catch (err) {
+      alert('Erro ao enviar áudio: ' + err.message)
+    } finally {
+      setAudioUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  async function handleRemoveAudio() {
+    if (!openId) return
+    if (!window.confirm('Remover o áudio deste hino?')) return
+    stopAudio()
+    await removeHymnAudio(openId)
+    setAudioMap((m) => { const n = { ...m }; delete n[openId]; return n })
   }
 
   function startEdit() {
@@ -338,19 +389,71 @@ export default function HymnPanel({ category, accent }) {
             </div>
 
             {/* Rodapé */}
-            {!editing && stanzas.length > 0 && (
-              <div className="px-5 py-3 border-t border-gray-800 flex justify-end">
-                <button
-                  onClick={handleProject}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${
-                    projActive
-                      ? 'bg-amber-700 hover:bg-amber-600 text-white'
-                      : 'bg-purple-700 hover:bg-purple-600 text-white'
-                  }`}
-                >
-                  <Tv className="w-4 h-4" />
-                  {projActive ? 'Parar projeção' : 'Projetar no telão'}
-                </button>
+            {!editing && (
+              <div className="px-5 py-3 border-t border-gray-800 flex items-center justify-between gap-3 flex-wrap">
+                {/* Player de áudio do hino */}
+                <div className="flex items-center gap-2">
+                  {audioMap[openHymn.id] ? (
+                    <>
+                      <button
+                        onClick={toggleAudio}
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-semibold text-sm transition-colors"
+                        title={audioPlaying ? 'Pausar' : 'Tocar áudio do hino'}
+                      >
+                        {audioPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                        {audioPlaying ? 'Pausar' : 'Tocar'}
+                      </button>
+                      <span className="text-emerald-400" title="Áudio salvo na nuvem">
+                        <Volume2 className="w-4 h-4" />
+                      </span>
+                      <button
+                        onClick={handleRemoveAudio}
+                        className="p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-gray-800 transition-colors"
+                        title="Remover áudio"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <audio
+                        ref={audioRef}
+                        src={audioMap[openHymn.id]}
+                        onEnded={() => setAudioPlaying(false)}
+                        className="hidden"
+                      />
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => audioInputRef.current?.click()}
+                      disabled={audioUploading}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 font-semibold text-sm transition-colors disabled:opacity-50"
+                      title="Carregar MP3 do hino"
+                    >
+                      <Upload className="w-4 h-4" />
+                      {audioUploading ? 'Enviando…' : 'Carregar áudio (MP3)'}
+                    </button>
+                  )}
+                  <input
+                    ref={audioInputRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={handleAudioUpload}
+                  />
+                </div>
+
+                {/* Projetar no telão */}
+                {stanzas.length > 0 && (
+                  <button
+                    onClick={handleProject}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold text-sm transition-colors ${
+                      projActive
+                        ? 'bg-amber-700 hover:bg-amber-600 text-white'
+                        : 'bg-purple-700 hover:bg-purple-600 text-white'
+                    }`}
+                  >
+                    <Tv className="w-4 h-4" />
+                    {projActive ? 'Parar projeção' : 'Projetar no telão'}
+                  </button>
+                )}
               </div>
             )}
           </div>
